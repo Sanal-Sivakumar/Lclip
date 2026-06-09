@@ -25,15 +25,15 @@ def log_ui(message):
 
 
 # Theme Constants
-ACCENT_COLOR = "#0078d4"      # Fluent Blue
-ACCENT_HOVER = "#2b88d8"
-BG_COLOR = "rgba(32, 32, 32, 0.75)" # Glassmorphic background
-BORDER_COLOR = "rgba(255, 255, 255, 0.12)"
-TEXT_COLOR = "#ffffff"
-TEXT_MUTED = "#b0b0b0"
-CARD_BG = "rgba(255, 255, 255, 0.05)"
-CARD_BG_HOVER = "rgba(255, 255, 255, 0.10)"
-CARD_BG_FOCUS = "rgba(255, 255, 255, 0.15)"
+ACCENT_COLOR = "#3b8beb"      # Glyphr Blue Accent
+ACCENT_HOVER = "#4a9aff"
+BG_COLOR = "rgba(18, 6, 6, 0.62)" # Glassmorphic background
+BORDER_COLOR = "rgba(255, 255, 255, 0.09)"
+TEXT_COLOR = "rgba(255, 255, 255, 0.92)"
+TEXT_MUTED = "rgba(255, 255, 255, 0.45)"
+CARD_BG = "rgba(255, 255, 255, 0.04)"
+CARD_BG_HOVER = "rgba(255, 255, 255, 0.08)"
+CARD_BG_FOCUS = "rgba(255, 255, 255, 0.12)"
 
 CACHE_DIR = os.path.expanduser("~/.cache/lclip")
 HISTORY_FILE = os.path.join(CACHE_DIR, "history.json")
@@ -222,14 +222,24 @@ class ClipboardCard(QFrame):
         self.checkbox.setChecked(not self.checkbox.isChecked())
 
     def update_style(self):
-        border = f"2px solid {TEXT_COLOR}" if self.hasFocus() else f"1px solid {BORDER_COLOR}"
+        is_pinned = self.item.get("pinned", False)
+        border_color = ACCENT_COLOR if is_pinned else BORDER_COLOR
+        border_width = "2px" if self.hasFocus() or is_pinned else "1px"
+        border = f"{border_width} solid {border_color}"
+        if self.hasFocus():
+            border = f"2px solid {TEXT_COLOR}"
+            
         bg = CARD_BG_FOCUS if self.hasFocus() else (CARD_BG_HOVER if self.is_checked else CARD_BG)
         
         self.setStyleSheet(f"""
             ClipboardCard {{
                 background-color: {bg};
                 border: {border};
-                border-radius: 8px;
+                border-radius: 10px;
+            }}
+            ClipboardCard:hover {{
+                background-color: {CARD_BG_HOVER};
+                border-color: rgba(255, 255, 255, 0.15);
             }}
         """)
 
@@ -280,9 +290,20 @@ class LclipWindow(QWidget):
         
         self.init_ui()
         self.setup_nav_connections()
+        
+        # Focus loss handler
+        QApplication.instance().focusChanged.connect(self.on_focus_changed)
+        
         self.switch_tab(0)
         
         log_ui("LclipWindow.__init__ end")
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        QTimer.singleShot(500, self.set_active_true)
+        
+    def set_active_true(self):
+        self.has_been_active = True
 
     def load_history(self):
         if os.path.exists(HISTORY_FILE):
@@ -300,6 +321,47 @@ class LclipWindow(QWidget):
                 json.dump(self.history, f, indent=2)
         except Exception as e:
             print(f"Error saving history: {e}", file=sys.stderr)
+
+    def add_to_history(self, content_type, content):
+        self.load_history()
+        existing_idx = -1
+        pinned = False
+        for i, item in enumerate(self.history):
+            if item.get("type") == content_type and item.get("content") == content:
+                existing_idx = i
+                pinned = item.get("pinned", False)
+                break
+        if existing_idx != -1:
+            self.history.pop(existing_idx)
+            
+        new_item = {
+            "type": content_type,
+            "content": content,
+            "pinned": pinned,
+            "timestamp": time.time()
+        }
+        self.history.insert(0, new_item)
+        
+        # Trim history
+        max_items = 80
+        pinned_items = [item for item in self.history if item.get("pinned", False)]
+        unpinned_items = [item for item in self.history if not item.get("pinned", False)]
+        allowed_unpinned = max_items - len(pinned_items)
+        if allowed_unpinned < 0:
+            allowed_unpinned = 0
+            
+        trimmed_unpinned = unpinned_items[allowed_unpinned:]
+        for item in trimmed_unpinned:
+            if item.get("type") == "image":
+                img_path = os.path.join(IMAGES_DIR, item.get("content"))
+                if os.path.exists(img_path):
+                    try:
+                        os.remove(img_path)
+                    except OSError:
+                        pass
+        self.history = pinned_items + unpinned_items[:allowed_unpinned]
+        self.history.sort(key=lambda x: (1 if x.get("pinned", False) else 0, x.get("timestamp", 0)), reverse=True)
+        self.save_history()
 
     def toggle_pin(self, index):
         self.load_history()
@@ -365,7 +427,7 @@ class LclipWindow(QWidget):
         layout.setSpacing(12)
         
         header = QHBoxLayout()
-        title = QLabel("Lclip", self)
+        title = QLabel("Glyphr", self)
         title.setStyleSheet(f"color: {TEXT_COLOR}; font-family: 'Inter'; font-size: 14pt; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
@@ -557,6 +619,8 @@ class LclipWindow(QWidget):
         self.search_input.setFocus()
         self.selected_items.clear()
         self.update_multi_bar()
+        if index == 0:
+            self.update_history_list()
 
     def setup_nav_connections(self):
         self.installEventFilter(self)
@@ -795,6 +859,7 @@ class LclipWindow(QWidget):
             self.copy_and_exit(combined_string)
 
     def copy_and_exit(self, text):
+        self.add_to_history("text", text)
         clipboard = QApplication.clipboard()
         clipboard.setText(text)
         
@@ -807,6 +872,7 @@ class LclipWindow(QWidget):
         self.close_and_exit()
 
     def copy_image_and_exit(self, filename):
+        self.add_to_history("image", filename)
         img_path = os.path.join(IMAGES_DIR, filename)
         if os.path.exists(img_path):
             pixmap = QPixmap(img_path)
@@ -883,6 +949,11 @@ class LclipWindow(QWidget):
             else:
                 self.clear_layout(item.layout())
 
+    def on_focus_changed(self, old, now):
+        log_ui(f"on_focus_changed: old={old}, now={now}")
+        if now is None:
+            QTimer.singleShot(150, self.check_should_hide)
+
     def changeEvent(self, event):
         if event.type() == QEvent.Type.ActivationChange:
             log_ui(f"changeEvent: ActivationChange, isActive={self.isActiveWindow()}")
@@ -893,10 +964,11 @@ class LclipWindow(QWidget):
         super().changeEvent(event)
 
     def check_should_hide(self):
-        log_ui(f"check_should_hide: has_been_active={self.has_been_active}, visible={self.isVisible()}, active={self.isActiveWindow()}")
+        focus_widget = QApplication.focusWidget()
+        log_ui(f"check_should_hide: has_been_active={self.has_been_active}, visible={self.isVisible()}, active={self.isActiveWindow()}, focus={focus_widget}")
         if not self.isVisible():
             return
-        if not self.isActiveWindow() and self.has_been_active:
+        if (not self.isActiveWindow() or focus_widget is None) and self.has_been_active:
             log_ui("check_should_hide: triggering close_and_exit")
             self.close_and_exit()
 
