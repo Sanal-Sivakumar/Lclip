@@ -412,7 +412,7 @@ class LclipWindow(QWidget):
             QFrame#MainFrame {{
                 background-color: {BG_COLOR};
                 border: 1px solid {BORDER_COLOR};
-                border-radius: 12px;
+                border-radius: 16px;
             }}
         """)
         
@@ -454,24 +454,25 @@ class LclipWindow(QWidget):
         layout.addLayout(header)
         
         self.tab_bar = QHBoxLayout()
-        self.tab_bar.setSpacing(4)
+        self.tab_bar.setSpacing(8)
         
         self.tab_buttons = []
         tabs_info = [
-            ("📋 Clipboard", 0),
-            ("😊 Emojis", 1),
-            ("٩(^‿^)۶ Kaomoji", 2),
-            ("½ Symbols", 3)
+            ("📋", 0),
+            ("😊", 1),
+            (";-)", 2),
+            ("🔣", 3)
         ]
         
+        self.tab_bar.addStretch()
         for name, idx in tabs_info:
             btn = QPushButton(name, self)
             btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-            btn.setFixedHeight(34)
-            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn.setFixedSize(44, 38)
             btn.clicked.connect(lambda checked, i=idx: self.switch_tab(i))
             self.tab_bar.addWidget(btn)
             self.tab_buttons.append(btn)
+        self.tab_bar.addStretch()
             
         layout.addLayout(self.tab_bar)
         
@@ -597,18 +598,20 @@ class LclipWindow(QWidget):
                     color: {color};
                     border: none;
                     border-bottom: {border_bottom};
-                    font-family: 'Inter';
-                    font-size: 10pt;
+                    font-family: 'Segoe UI Emoji', 'Inter';
+                    font-size: 14pt;
                     font-weight: {weight};
-                    padding-bottom: 6px;
+                    padding-bottom: 4px;
                 }}
                 QPushButton:hover {{
                     color: {TEXT_COLOR};
                     background: rgba(255,255,255,0.04);
+                    border-radius: 6px;
                 }}
-                QPushButton:focus {{
+                QPushButton:focus-visible {{
                     outline: none;
                     background: rgba(255,255,255,0.08);
+                    border-radius: 6px;
                 }}
             """)
 
