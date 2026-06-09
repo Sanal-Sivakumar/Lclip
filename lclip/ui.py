@@ -294,6 +294,7 @@ class LclipWindow(QWidget):
         # Focus loss handler
         QApplication.instance().focusChanged.connect(self.on_focus_changed)
         
+        self.check_and_sync_clipboard()
         self.switch_tab(0)
         
         log_ui("LclipWindow.__init__ end")
@@ -304,6 +305,18 @@ class LclipWindow(QWidget):
         
     def set_active_true(self):
         self.has_been_active = True
+
+    def check_and_sync_clipboard(self):
+        try:
+            clipboard = QApplication.clipboard()
+            text = clipboard.text().strip()
+            if text:
+                self.load_history()
+                if not self.history or self.history[0].get("content") != text:
+                    log_ui("check_and_sync_clipboard: syncing new clipboard text on startup")
+                    self.add_to_history("text", text)
+        except Exception as e:
+            log_ui(f"check_and_sync_clipboard error: {e}")
 
     def load_history(self):
         if os.path.exists(HISTORY_FILE):
