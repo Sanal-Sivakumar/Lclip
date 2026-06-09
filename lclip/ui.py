@@ -306,6 +306,16 @@ class LclipWindow(QWidget):
     def set_active_true(self):
         self.has_been_active = True
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self.drag_position)
+            event.accept()
+
     def check_and_sync_clipboard(self):
         try:
             clipboard = QApplication.clipboard()
@@ -440,7 +450,7 @@ class LclipWindow(QWidget):
         layout.setSpacing(12)
         
         header = QHBoxLayout()
-        title = QLabel("Glyphr", self)
+        title = QLabel("Lclip", self)
         title.setStyleSheet(f"color: {TEXT_COLOR}; font-family: 'Inter'; font-size: 14pt; font-weight: bold;")
         header.addWidget(title)
         header.addStretch()
