@@ -5,6 +5,7 @@ import time
 import hashlib
 import subprocess
 import threading
+import atexit
 
 CACHE_DIR = os.path.expanduser("~/.cache/lclip")
 HISTORY_FILE = os.path.join(CACHE_DIR, "history.json")
@@ -150,21 +151,71 @@ class ClipboardWatcher(threading.Thread):
     def run(self):
         print(f"Clipboard watcher started. wayland: {self.is_wayland}, wl-clipboard: {self.has_wl_clipboard}, xclip: {self.has_xclip}")
         
+        use_watch = self.is_wayland and self.has_wl_clipboard
+        watch_proc = None
+        
+        if use_watch:
+            try:
+                watch_proc = subprocess.Popen(
+                    ["wl-paste", "--watch", "echo"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    bufsize=1
+                )
+                
+                # Ensure the subprocess is cleaned up when the main program exits
+                def cleanup_watch():
+                    if watch_proc and watch_proc.poll() is None:
+                        try:
+                            watch_proc.terminate()
+                        except Exception:
+                            pass
+                atexit.register(cleanup_watch)
+                
+                print("Using wl-paste --watch for event-driven clipboard monitoring.")
+            except Exception as e:
+                print(f"Failed to start wl-paste --watch: {e}. Falling back to polling.", file=sys.stderr)
+                use_watch = False
+
         while self.running:
             try:
                 if is_ui_running():
                     time.sleep(0.5)
                     continue
                     
-                if self.is_wayland and self.has_wl_clipboard:
+                if use_watch and watch_proc:
+                    # Check if process died
+                    if watch_proc.poll() is not None:
+                        print("wl-paste --watch process died. Falling back to polling.", file=sys.stderr)
+                        use_watch = False
+                        continue
+                        
+                    # Block and wait for clipboard change event (newline from echo)
+                    line = watch_proc.stdout.readline()
+                    if not line:
+                        # EOF, process died
+                        continue
+                        
                     self._check_wayland_clipboard()
-                elif self.has_xclip:
-                    self._check_x11_clipboard()
-                elif self.has_wl_clipboard:
-                    self._check_wayland_clipboard()
+                else:
+                    # Fallback to polling
+                    if self.is_wayland and self.has_wl_clipboard:
+                        self._check_wayland_clipboard()
+                    elif self.has_xclip:
+                        self._check_x11_clipboard()
+                    
+                    # 1.5 seconds polling interval for X11 to reduce CPU overhead
+                    time.sleep(1.5)
             except Exception as e:
                 print(f"Error checking clipboard: {e}", file=sys.stderr)
-            time.sleep(0.5)
+                time.sleep(1.5)
+                
+        if watch_proc:
+            try:
+                watch_proc.terminate()
+            except Exception:
+                pass
 
     def _check_wayland_clipboard(self):
         if not self.has_wl_clipboard:
