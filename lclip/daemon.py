@@ -205,11 +205,11 @@ class ClipboardWatcher(threading.Thread):
                     elif self.has_xclip:
                         self._check_x11_clipboard()
                     
-                    # 1.5 seconds polling interval for X11 to reduce CPU overhead
-                    time.sleep(1.5)
+                    # 3.0 seconds polling interval to reduce CPU and process-spawning overhead
+                    time.sleep(3.0)
             except Exception as e:
                 print(f"Error checking clipboard: {e}", file=sys.stderr)
-                time.sleep(1.5)
+                time.sleep(3.0)
                 
         if watch_proc:
             try:
