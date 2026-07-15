@@ -1,0 +1,47 @@
+{
+  "name": "lclip",
+  "version": "1.0.0",
+  "description": "A system-integrated clipboard history and expression picker for Linux",
+  "main": "src/main/main.mjs",
+  "type": "module",
+  "private": true,
+  "author": "LClip",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron . --show",
+    "dev": "electron . --show --dev",
+    "check": "node --check src/main/main.mjs && node --check src/main/store.mjs && node --check src/main/paste-bridge.mjs && node --check src/preload/preload.cjs && node --check src/renderer/app.js",
+    "test": "node --test tests/*.test.mjs",
+    "verify": "npm run check && npm test",
+    "pack:linux": "electron-builder --linux dir",
+    "dist:linux": "electron-builder --linux AppImage deb rpm"
+  },
+  "devDependencies": {
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.lclip.LClip",
+    "productName": "LClip",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": ["AppImage", "deb", "rpm"],
+      "category": "Utility",
+      "executableName": "lclip",
+      "icon": "assets/io.lclip.LClip.png",
+      "artifactName": "LClip-${version}-${arch}.${ext}",
+      "desktop": {
+        "entry": {
+          "Name": "LClip",
+          "Comment": "Clipboard history and expression picker",
+          "Keywords": "clipboard;emoji;kaomoji;gif;symbols;"
+        }
+      }
+    }
+  }
+}
