@@ -166,8 +166,10 @@ The installer performs the complete setup:
 7. Creates the `lclip` terminal command and application-menu entry.
 8. Adds graphical-login autostart for supported desktop environments.
 9. Configures the native `Super + .` custom shortcut when installing from a GNOME session.
-10. Attempts to install and start an automatic-paste bridge using `apt`, `dnf`, `pacman`, or `zypper`.
-11. With `--configure-ydotool`, creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
+10. Attempts to install automatic-paste tools using `apt`, `dnf`, `pacman`, or `zypper`.
+11. With `--configure-ydotool`, installs both the `ydotool` client and separately packaged `ydotoold` daemon when required by the distribution.
+12. Creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
+13. Installs and enables `~/.config/systemd/user/lclip-ydotoold.service` when the distribution does not provide a usable user service.
 
 > [!IMPORTANT]
 > After using `--configure-ydotool`, **log out of Linux completely and log back in**. Opening a new terminal is not enough. Linux applies the new `lclip-uinput` group membership only to a new login session.
@@ -176,7 +178,7 @@ After logging back in, confirm the environment and start LClip:
 
 ```bash
 groups | tr ' ' '\n' | grep '^lclip-uinput$'
-systemctl --user status ydotool.service --no-pager 2>/dev/null || true
+systemctl --user status lclip-ydotoold.service --no-pager
 lclip --show
 ```
 
@@ -214,6 +216,8 @@ LClip will still copy selected values to the clipboard. Until a supported bridge
 | `/usr/share/icons/hicolor/scalable/apps/io.lclip.LClip.svg` | System application icon |
 | `/etc/xdg/autostart/io.lclip.LClip.desktop` | Starts LClip after graphical login |
 | `/etc/udev/rules.d/80-lclip-uinput.rules` | Optional restricted `/dev/uinput` rule created by `--configure-ydotool` |
+| `/etc/modules-load.d/lclip-uinput.conf` | Ensures the `uinput` kernel module is available after boot |
+| `~/.config/systemd/user/lclip-ydotoold.service` | Per-user daemon service created by `--configure-ydotool` |
 
 ## Global shortcut integration
 

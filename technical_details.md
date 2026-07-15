@@ -259,10 +259,13 @@ The optional installer flag `--configure-ydotool` performs a restricted setup:
 2. Adds the current desktop user to that group.
 3. Installs `/etc/udev/rules.d/80-lclip-uinput.rules`.
 4. Assigns only `/dev/uinput` to that group with mode `0660`.
-5. Loads the `uinput` kernel module and reloads udev rules when those tools are available.
-6. Enables the distribution-provided `ydotool` or `ydotoold` service.
+5. Installs `/etc/modules-load.d/lclip-uinput.conf`, loads the `uinput` kernel module, and reloads udev rules when those tools are available.
+6. Installs the separate `ydotoold` package when a distribution splits the client and daemon.
+7. Creates and enables `~/.config/systemd/user/lclip-ydotoold.service` using the detected daemon path.
 
 Mode `0660` gives read/write access only to root and members of the dedicated group. It does not make the device world-writable. A full logout/login is required because an already-running graphical session does not acquire newly added group memberships.
+
+Ubuntu 24.04 packages the `ydotool` command and `ydotoold` daemon separately. Merely finding `/usr/bin/ydotool` therefore does not prove that automatic paste can operate. The installer requires both commands in `--configure-ydotool` mode and supplies its own user service because some Ubuntu daemon packages contain only the executable.
 
 ### wtype
 

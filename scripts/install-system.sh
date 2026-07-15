@@ -159,7 +159,10 @@ fi
 
 NEEDS_RELOGIN=0
 if [[ "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
+  [[ "${EUID}" -ne 0 ]] || { echo "Run this installer as the desktop user without sudo; it will request sudo when needed." >&2; exit 1; }
   command -v ydotool >/dev/null || { echo "ydotool could not be installed from this distribution's repositories." >&2; exit 1; }
+  command -v ydotoold >/dev/null || install_bridge_package ydotoold || true
+  command -v ydotoold >/dev/null || { echo "The ydotoold daemon could not be installed. Automatic ydotool paste is unavailable." >&2; exit 1; }
   LOGIN_USER="${SUDO_USER:-${USER:-}}"
   [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]] || { echo "Run this installer as the desktop user, not with sudo, to configure ydotool." >&2; exit 1; }
 
@@ -172,10 +175,38 @@ KERNEL=="uinput", GROUP="lclip-uinput", MODE="0660", OPTIONS+="static_node=uinpu
 EOF
   "${SUDO[@]}" install -m 0644 "$UINPUT_RULE" /etc/udev/rules.d/80-lclip-uinput.rules
   rm -f "$UINPUT_RULE"
+  printf 'uinput\n' | "${SUDO[@]}" tee /etc/modules-load.d/lclip-uinput.conf >/dev/null
   "${SUDO[@]}" modprobe uinput || true
   if command -v udevadm >/dev/null; then
     "${SUDO[@]}" udevadm control --reload-rules || true
     "${SUDO[@]}" udevadm trigger --name-match=uinput || true
+  fi
+
+  YDOTOOLD_PATH="$(command -v ydotoold)"
+  USER_SERVICE_DIR="$HOME/.config/systemd/user"
+  install -d -m 0700 "$USER_SERVICE_DIR"
+  YDOTOOL_SERVICE="$(mktemp)"
+  cat >"$YDOTOOL_SERVICE" <<EOF
+[Unit]
+Description=LClip ydotool input daemon
+Documentation=https://github.com/ReimuNotMoe/ydotool
+ConditionPathExists=/dev/uinput
+
+[Service]
+Type=simple
+ExecStart=$YDOTOOLD_PATH
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+EOF
+  install -m 0644 "$YDOTOOL_SERVICE" "$USER_SERVICE_DIR/lclip-ydotoold.service"
+  rm -f "$YDOTOOL_SERVICE"
+  if command -v systemctl >/dev/null; then
+    systemctl --user daemon-reload || true
+    systemctl --user enable lclip-ydotoold.service || true
+    systemctl --user start lclip-ydotoold.service || true
   fi
   NEEDS_RELOGIN=1
 fi

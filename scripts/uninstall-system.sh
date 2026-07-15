@@ -7,6 +7,12 @@ if [[ "${EUID}" -ne 0 && "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v node >/
   node "$PROJECT_DIR/scripts/configure-gnome-shortcut.mjs" --remove || true
 fi
 
+if command -v systemctl >/dev/null; then
+  systemctl --user disable --now lclip-ydotoold.service >/dev/null 2>&1 || true
+fi
+rm -f "$HOME/.config/systemd/user/lclip-ydotoold.service"
+command -v systemctl >/dev/null && systemctl --user daemon-reload >/dev/null 2>&1 || true
+
 if [[ "${EUID}" -eq 0 ]]; then SUDO=(); else SUDO=(sudo); fi
 LOGIN_USER="${SUDO_USER:-${USER:-}}"
 pkill -x lclip 2>/dev/null || true
@@ -17,6 +23,7 @@ pkill -x lclip 2>/dev/null || true
 "${SUDO[@]}" rm -f /etc/xdg/autostart/io.lclip.LClip.desktop
 if [[ -f /etc/udev/rules.d/80-lclip-uinput.rules ]]; then
   "${SUDO[@]}" rm -f /etc/udev/rules.d/80-lclip-uinput.rules
+  "${SUDO[@]}" rm -f /etc/modules-load.d/lclip-uinput.conf
   if [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]] && getent group lclip-uinput >/dev/null; then
     "${SUDO[@]}" gpasswd -d "$LOGIN_USER" lclip-uinput >/dev/null 2>&1 || true
   fi

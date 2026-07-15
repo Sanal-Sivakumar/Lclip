@@ -30,6 +30,7 @@ groups
 ls -l /dev/uinput 2>/dev/null || true
 systemctl --user status ydotool.service --no-pager 2>/dev/null || true
 systemctl --user status ydotoold.service --no-pager 2>/dev/null || true
+systemctl --user status lclip-ydotoold.service --no-pager 2>/dev/null || true
 ls -l /etc/xdg/autostart/io.lclip.LClip.desktop
 ls -l ~/.config/autostart/io.lclip.LClip.desktop 2>/dev/null || true
 ```
@@ -261,6 +262,37 @@ lclip --show
 
 The new `/usr/local/bin/lclip` should contain an `exec /opt/lclip/lclip "$@"` command. If the current installer failed before its installation phase, an old launcher elsewhere in `PATH` can remain active. Check every match with `type -a lclip`, including `~/.local/bin/lclip`. If `git pull --ff-only` refuses because the checkout has local modifications, preserve those changes with a commit or backup before updating; do not use a destructive reset merely to bypass the warning.
 
+### `/usr/local/bin/lclip --show` opens Electron, but `lclip --show` requests Python
+
+**Cause:** The system launcher is correct, but the shell finds a legacy user launcher, alias, or function first. Directories such as `~/.local/bin` commonly appear before `/usr/local/bin` in `PATH`. Clearing the shell command hash does not change that ordering.
+
+**Identify every definition:**
+
+```bash
+type -a lclip
+command -V lclip
+```
+
+Inspect each file reported before `/usr/local/bin/lclip`. Remove or rename it only when its content refers to the obsolete `.venv/bin/python3` implementation. Common locations are:
+
+```bash
+grep -n '\.venv/bin/python3' ~/.local/bin/lclip ~/bin/lclip 2>/dev/null || true
+rm -f ~/.local/bin/lclip ~/bin/lclip
+unalias lclip 2>/dev/null || true
+unset -f lclip 2>/dev/null || true
+hash -r
+```
+
+Verify that the selected command and installed launcher are now correct:
+
+```bash
+command -v lclip
+sed -n '1,10p' /usr/local/bin/lclip
+lclip --show
+```
+
+`command -v lclip` should print `/usr/local/bin/lclip`, and that launcher should execute `/opt/lclip/lclip "$@"`.
+
 ### `lclip: command not found`
 
 **Cause:** The launcher was not installed or `/usr/local/bin` is not in the shell's `PATH`.
@@ -445,7 +477,8 @@ Then **log out of the entire Linux desktop and log back in**. Do not merely clos
 groups | tr ' ' '\n' | grep '^lclip-uinput$'
 ls -l /dev/uinput
 systemctl --user status ydotool.service --no-pager 2>/dev/null || \
-  systemctl --user status ydotoold.service --no-pager
+  systemctl --user status ydotoold.service --no-pager 2>/dev/null || \
+  systemctl --user status lclip-ydotoold.service --no-pager
 /usr/local/bin/lclip --show
 ```
 
@@ -454,6 +487,7 @@ Expected signals:
 - the current user belongs to `lclip-uinput`;
 - `/dev/uinput` has group `lclip-uinput` and mode equivalent to `0660`;
 - a `ydotool` or `ydotoold` user service is active, when supplied by the distribution.
+- otherwise, the installer-created `lclip-ydotoold.service` is active.
 
 The picker intentionally hides before attempting paste so focus can return to the previous application. After a failed attempt, the status changes to “Copied · press Ctrl+V to paste” and a desktop notification is shown. The LClip process remains running and can be reopened with `Super + .` or `lclip --show`.
 
@@ -467,11 +501,32 @@ The picker intentionally hides before attempting paste so focus can return to th
 systemctl status ydotool.service 2>/dev/null || true
 systemctl --user status ydotool.service 2>/dev/null || true
 systemctl --user status ydotoold.service 2>/dev/null || true
+systemctl --user status lclip-ydotoold.service 2>/dev/null || true
 groups
 ls -l /dev/uinput 2>/dev/null || true
 ```
 
 **Solution:** Rerun `./scripts/install-system.sh --configure-ydotool`, log out, and log back in. Avoid running the entire LClip application as root. Do not use `chmod 666 /dev/uinput`; LClip's rule grants access only to `root` and the dedicated `lclip-uinput` group. Restart LClip after the bridge becomes available because bridge detection happens at application startup.
+
+### `/dev/uinput` is correct, but no `ydotool` service exists
+
+**Cause:** Ubuntu 24.04 packages `ydotool` and `ydotoold` separately, and the daemon package may provide the executable without a user systemd unit. The `ydotool` command alone cannot maintain the persistent virtual input device required for reliable operation.
+
+**Solution:** Current `--configure-ydotool` installation installs the daemon package and creates `~/.config/systemd/user/lclip-ydotoold.service`. After updating the repository:
+
+```bash
+cd ~/Documents/Lclip
+git pull --ff-only origin main
+./scripts/install-system.sh --configure-ydotool
+sudo reboot
+```
+
+After login:
+
+```bash
+groups | tr ' ' '\n' | grep '^lclip-uinput$'
+systemctl --user status lclip-ydotoold.service --no-pager
+```
 
 ### `wtype` is installed but does not work
 
