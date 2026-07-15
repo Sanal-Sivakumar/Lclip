@@ -8,7 +8,7 @@ const demoState = {
     { id: "demo-3", text: "https://github.com/", createdAt: Date.now() - 3_600_000 }
   ],
   settings: { captureEnabled: true, autostartEnabled: true, giphyApiKey: "", gifRating: "pg" },
-  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, session: "preview", desktop: "" }
+  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, lastPasteOutcome: "", session: "preview", desktop: "" }
 };
 
 const demoApi = {
@@ -257,7 +257,7 @@ function renderStatus() {
   const enabled = state.data.settings.captureEnabled;
   $("#captureStatus").classList.toggle("paused", !enabled);
   $("#captureStatus span").textContent = enabled ? `Capture on · ${state.data.history.length}/10 items` : "Clipboard capture is paused";
-  $("#pasteStatus").textContent = state.data.status.pasteBridge;
+  $("#pasteStatus").textContent = state.data.status.lastPasteOutcome || state.data.status.pasteBridge;
 }
 
 function selectables() { return $$('[data-selectable="true"]'); }
@@ -275,13 +275,13 @@ function selectIndex(index, scroll = true) {
 
 async function activateValue(value) {
   const result = await api.activate(value);
-  if (!result?.pasted && api.platform === "browser") toast("Copied in preview mode");
+  if (!result?.pasted) toast(api.platform === "browser" ? "Copied in preview mode" : "Copied · press Ctrl+V to paste");
 }
 
 async function activateGif(gif) {
   try {
     const result = await api.activateGif(gif);
-    if (!result?.pasted && api.platform === "browser") toast("GIF selected in preview mode");
+    if (!result?.pasted) toast(api.platform === "browser" ? "GIF selected in preview mode" : "GIF copied · press Ctrl+V to paste");
   } catch (error) {
     toast(error.message || "Could not paste that GIF");
   }

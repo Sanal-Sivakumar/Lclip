@@ -69,13 +69,25 @@ echo "$XDG_CURRENT_DESKTOP"
 
 ### Global shortcut
 
-A global shortcut is a specific chord registered with the desktop so it works while another application has focus. It is different from a **global keyboard hook**, which can receive many or all key events. LClip uses Electron's `globalShortcut` API and registers only `Super+.` (with `Super+Period` as a spelling fallback for the same chord).
+A global shortcut is a specific chord registered with the desktop so it works while another application has focus. It is different from a **global keyboard hook**, which can receive many or all key events. LClip uses Electron's `globalShortcut` API and registers only `Super+.`.
 
 ### Portals and XDG Desktop Portal
 
 **XDG Desktop Portal** is a set of desktop-neutral interfaces that lets sandboxed or security-conscious applications request desktop operations. A desktop-specific backend decides how the request is presented and enforced.
 
 LClip enables Electron's `GlobalShortcutsPortal` and `GlobalShortcutsPortalPreferredTrigger` features. On compatible Wayland environments, Electron can ask the portal for the `Super + .` shortcut. The desktop may ask the user to approve it once and remember the decision. LClip cannot bypass a desktop's permission system, and it should not attempt to do so.
+
+### GNOME native custom shortcut
+
+Electron's portal registration can be unavailable or rejected on some GNOME/Wayland combinations. During installation from an active GNOME session, `scripts/configure-gnome-shortcut.mjs` also uses GNOME's `gsettings` interface to create one native custom shortcut:
+
+```text
+Name: LClip
+Command: /usr/local/bin/lclip --show
+Binding: <Super>period
+```
+
+The script reads the current custom-keybinding array, preserves every existing entry, and adds LClip's dedicated path. It never binds `Ctrl+V`, `Super+V`, or an alternative chord. The uninstaller removes only LClip's binding path. Electron registration and the GNOME command can both call `showWindow`; repeated show requests are idempotent and do not toggle the picker closed.
 
 ### Clipboard and selection
 
@@ -174,6 +186,8 @@ This is safer than exposing all of Electron. The renderer can request an approve
 
 The picker is an Electron `BrowserWindow` configured as frameless, transparent, always on top, absent from the taskbar, visible on every workspace, and hidden when it loses focus. The visual “glass” comes from translucent CSS layers, borders, shadows, and blur-capable compositing. Actual appearance can differ with compositor support, GPU drivers, and accessibility settings.
 
+The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A visible six-dot region uses Electron's `-webkit-app-region: drag` behavior; after the user drags the window, later openings preserve that position instead of forcing it back to the center.
+
 ### Tray
 
 The tray is a small status icon provided by the desktop panel. GNOME may require an AppIndicator or tray extension to display traditional tray icons. The global shortcut and autostart do not logically depend on the icon being visible.
@@ -190,7 +204,10 @@ The tray is a small status icon provided by the desktop panel. GNOME may require
 6. IPC handlers are registered.
 7. The global shortcut is registered.
 8. Clipboard polling begins.
-9. `--show` opens the window; `--hidden` leaves it in the background.
+9. The renderer loads while the window remains hidden.
+10. `--show` opens the ready window; `--hidden` leaves it resident in the background.
+
+The first process start is a **cold start** because Electron and the renderer must load. Later `lclip --show` commands encounter the single-instance lock and forward the request to the resident process, producing a much faster **warm opening**.
 
 ### Capture flow
 
@@ -210,8 +227,8 @@ The tray is a small status icon provided by the desktop panel. GNOME may require
 3. It writes the value to the system clipboard.
 4. The value is also moved to the front of history.
 5. The window hides and waits 150 milliseconds.
-6. The paste bridge sends `Ctrl+V`.
-7. If that fails, LClip leaves the value copied and displays a notification.
+6. The paste bridge sends `Ctrl+V`; if it fails, the next detected bridge is attempted.
+7. If every bridge fails, LClip leaves the value copied, displays a notification, and records “Copied · press Ctrl+V to paste” for the status bar.
 
 ### GIF flow
 
@@ -230,7 +247,22 @@ Writing to the clipboard and causing another app to paste are separate operation
 
 ### ydotool
 
-`ydotool` can inject Linux input through the kernel's `uinput` mechanism and is LClip's first choice. It commonly relies on a `ydotoold` daemon or distribution-provided service and appropriate access to `/dev/uinput`. LClip sends the Linux key codes for Ctrl and V. Installation alone may not be sufficient if the daemon or device permission is unavailable.
+`ydotool` can inject Linux input through the kernel's `uinput` mechanism and is LClip's first choice. Current ydotool versions require the `ydotoold` daemon or distribution-provided service and appropriate access to `/dev/uinput`. LClip sends Linux key codes 29 and 47 for Ctrl and V. Installing the executable alone is not sufficient if the daemon or device permission is unavailable.
+
+### `/dev/uinput`, udev, and the `lclip-uinput` group
+
+`/dev/uinput` is a special Linux device through which an authorized process can create a virtual keyboard or mouse. Access is security-sensitive because it permits synthetic input.
+
+The optional installer flag `--configure-ydotool` performs a restricted setup:
+
+1. Creates a system group named `lclip-uinput`.
+2. Adds the current desktop user to that group.
+3. Installs `/etc/udev/rules.d/80-lclip-uinput.rules`.
+4. Assigns only `/dev/uinput` to that group with mode `0660`.
+5. Loads the `uinput` kernel module and reloads udev rules when those tools are available.
+6. Enables the distribution-provided `ydotool` or `ydotoold` service.
+
+Mode `0660` gives read/write access only to root and members of the dedicated group. It does not make the device world-writable. A full logout/login is required because an already-running graphical session does not acquire newly added group memberships.
 
 ### wtype
 
@@ -242,14 +274,14 @@ Writing to the clipboard and causing another app to paste are separate operation
 
 ### Detection order
 
-LClip searches each directory in `PATH` and chooses:
+LClip searches each directory in `PATH` and builds an ordered candidate list:
 
 1. `ydotool` on Linux;
 2. `wtype` when the session is Wayland;
 3. `xdotool` as the X11 or Xwayland fallback;
 4. copy-only mode if none is available.
 
-The status bar and Settings show the selected result.
+During activation, LClip attempts each candidate until one exits successfully. This matters when `ydotool` is installed but `ydotoold` is not ready, or when `wtype` is installed but unsupported by the current compositor. The status bar and Settings show the preferred detected result, while the latest activation outcome reports whether paste actually succeeded.
 
 ## 7. State and persistence
 
@@ -284,6 +316,8 @@ The directory is created with mode `0700`, meaning only the owner can enter or l
 
 `sandbox: true` applies Chromium renderer sandbox restrictions. The main process remains privileged enough to use Electron desktop APIs, so it must validate renderer requests.
 
+Linux Electron bundles contain a helper named `chrome-sandbox`. For the set-user-ID sandbox path to be accepted, the installed helper must be owned by `root:root` and have mode `4755`. The system installer changes the complete `/opt/lclip` bundle to root ownership and explicitly applies `4755` to this helper. Running with `--no-sandbox` is not an acceptable replacement.
+
 ### Node integration
 
 `nodeIntegration: false` prevents renderer scripts from directly using Node.js APIs such as filesystem access or process execution.
@@ -300,7 +334,7 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 
 ### npm and package.json
 
-**npm** installs JavaScript packages and runs named scripts. `package.json` describes LClip, pins development dependencies, and configures Electron Builder. `package-lock.json` records exact dependency versions for repeatable installs.
+**npm** installs JavaScript packages and runs named scripts. `package.json` describes LClip, pins development dependencies, and configures Electron Builder. `package-lock.json` records exact dependency versions for repeatable installs. LClip declares Node.js `>=22.12.0` because Electron 43 and its packaging dependencies do not support the Node.js 18 runtime commonly present in older Ubuntu repositories. `.nvmrc` selects Node 22 for developers using NVM.
 
 `npm ci` performs a clean installation that exactly follows the lock file. It is preferred for installers and CI. `npm install` can update lock-file resolution and is used during development when dependencies change.
 
@@ -329,6 +363,15 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 
 `sudo` runs an approved command with administrator privileges. LClip needs it to write system locations, but the installed app later runs as the normal desktop user.
 
+### Installer modes
+
+- No option: builds, verifies, installs, and attempts best-effort bridge package/service setup.
+- `--configure-ydotool`: additionally configures restricted `/dev/uinput` access for the current desktop user.
+- `--skip-input-bridge`: installs LClip without installing or configuring input tools.
+- `--help`: prints the supported choices without changing the system.
+
+The installer rejects conflicting or unknown options. It must be invoked as the desktop user so `sudo` is used only for system file operations and the GNOME shortcut is written into the correct user's settings.
+
 ## 10. Tests and verification
 
 `npm run verify` performs JavaScript syntax checking and runs Node's built-in test runner. Current tests verify:
@@ -339,15 +382,16 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 - `ydotool` is preferred;
 - `wtype` is selected on Wayland when needed;
 - missing bridges are reported as unavailable.
+- paste falls back to the next candidate when the preferred bridge exits with an error.
 
-These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
+The current suite contains seven tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
 
 ## 11. Known boundaries
 
 - Text history only; copied images and files are not retained as history entries.
 - A maximum of 10 entries is intentional.
 - The shortcut is fixed to `Super + .`.
-- Automatic paste depends on an external bridge and desktop security policy.
+- Automatic paste depends on an external bridge, its service/device permissions, and desktop security policy.
 - A one-time Wayland permission request may be controlled by the desktop.
 - GIFs require a GIPHY key, network access, and a target that accepts an image or HTML clipboard format.
 - The tray icon may be hidden by GNOME without a tray extension.

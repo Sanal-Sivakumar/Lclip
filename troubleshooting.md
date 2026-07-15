@@ -2,6 +2,19 @@
 
 This document records the important development problems addressed in LClip and provides a practical diagnostic guide for installation and runtime failures.
 
+## Problems encountered and their status
+
+| Observed problem | Root cause | Implemented resolution |
+| --- | --- | --- |
+| Old launcher requested `.venv/bin/python3` | Legacy Python installation remained earlier in `PATH` | Current Electron installer replaces `/usr/local/bin/lclip`; troubleshooting identifies additional stale launchers |
+| `npm WARN EBADENGINE` followed by `ERR_REQUIRE_ESM` | Ubuntu Node.js 18 was too old for Electron 43 | Node `>=22.12.0`, `.nvmrc`, package engine declaration, and installer preflight check |
+| Electron aborted on `chrome-sandbox` | Helper ownership/mode was unsafe after copying | Installer applies `root:root` ownership and mode `4755` |
+| `Super + .` did not open the picker | Electron/Wayland portal registration was unavailable or conflicted | GNOME-native custom shortcut plus Electron registration of the same chord |
+| First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
+| Picker disappeared after selection | It hides intentionally to restore previous-app focus | Persistent process, reliable shortcut reopening, notification, and recorded paste outcome |
+| “Automatic paste is unavailable” | Bridge executable existed but its service/protocol/device permission failed | Ordered bridge fallback and optional restricted `ydotool` `/dev/uinput` configuration |
+| Window was difficult to move and re-centered | Search covered most of the drag region; every show repositioned it | Visible six-dot drag handle and one-time centering per process |
+
 ## 1. Quick diagnosis
 
 Run these commands from a Linux terminal:
@@ -13,6 +26,10 @@ pgrep -a lclip
 command -v ydotool || true
 command -v wtype || true
 command -v xdotool || true
+groups
+ls -l /dev/uinput 2>/dev/null || true
+systemctl --user status ydotool.service --no-pager 2>/dev/null || true
+systemctl --user status ydotoold.service --no-pager 2>/dev/null || true
 ls -l /etc/xdg/autostart/io.lclip.LClip.desktop
 ls -l ~/.config/autostart/io.lclip.LClip.desktop 2>/dev/null || true
 ```
@@ -24,6 +41,8 @@ Interpretation:
 - `XDG_SESSION_TYPE=wayland` means Wayland security and portal behavior apply.
 - A user autostart file containing `Hidden=true` means “Start after login” is disabled.
 - No input-bridge command means selection will copy successfully but cannot automatically send `Ctrl+V`.
+- On a `--configure-ydotool` installation, `groups` should include `lclip-uinput` after logout/login.
+- `/dev/uinput` should show group `lclip-uinput` and group read/write permission.
 
 ## 2. Development problem log
 
@@ -51,7 +70,7 @@ This section distinguishes solved design problems from environment-dependent lim
 
 **Risk:** One paste tool cannot work on every compositor and application. Claiming universal support would be misleading.
 
-**Implemented solution:** LClip detects `ydotool`, then Wayland-compatible `wtype`, then X11/Xwayland `xdotool`. If none succeeds, LClip keeps the selection on the clipboard and tells the user to press `Ctrl+V`.
+**Implemented solution:** LClip detects `ydotool`, then Wayland-compatible `wtype`, then X11/Xwayland `xdotool`, and tries the next candidate when one fails. The optional `--configure-ydotool` installer mode creates restricted `/dev/uinput` access. If no bridge succeeds, LClip keeps the selection on the clipboard and tells the user to press `Ctrl+V`.
 
 ### Problem: the selected value could paste back into LClip
 
@@ -115,11 +134,13 @@ This section distinguishes solved design problems from environment-dependent lim
 
 **Solution:** Install/configure `sudo`, use an administrator account, or run the installer as root from a trusted local checkout. Do not modify the script to silently install shared files without authorization.
 
-### `npm: command not found` or Node is too old
+### `npm: command not found`, `npm WARN EBADENGINE`, or Node is too old
 
 **Cause:** Node.js and npm are build dependencies, not bundled in the source repository.
 
-**Solution:** Install Node.js 20 or newer using the distribution's supported package source or a trusted Node version manager. Confirm:
+Electron 43 and its current packaging dependencies require Node.js 22.12.0 or newer. Ubuntu's Node.js 18 package is too old even though LClip's syntax checks and unit tests may still pass with it.
+
+**Solution:** Install Node.js 22 using the distribution's supported package source or a trusted Node version manager. Confirm:
 
 ```bash
 node --version
@@ -127,6 +148,22 @@ npm --version
 ```
 
 Then rerun the installer.
+
+### `Error [ERR_REQUIRE_ESM]` from `@noble/hashes/blake2.js`
+
+**Cause:** The transcript that produced this error used Node.js `18.19.1` with Electron 43 and electron-builder dependencies that declare Node.js `22.12.0` or newer. Dependency installation emitted `npm WARN EBADENGINE`, tests happened to pass, and packaging then failed before `/opt/lclip` or the new launcher could be installed.
+
+**Solution:** Upgrade to Node.js 22.12.0 or newer, remove the dependency directory installed by the incompatible runtime, and rerun the current installer:
+
+```bash
+cd ~/Documents/Lclip
+node --version
+rm -rf node_modules
+npm ci
+./scripts/install-system.sh
+```
+
+Do not edit `node_modules/app-builder-lib/out/targets/blockmap/blockmap.js` or convert its `require()` call manually. That would modify generated dependency code while leaving the unsupported Node runtime in place.
 
 ### `npm ci` reports lock-file or dependency errors
 
@@ -176,6 +213,54 @@ Do not manually copy an artifact for a different processor architecture.
 
 ## 4. Startup and process failures
 
+### `FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166`
+
+The complete message says that `/opt/lclip/chrome-sandbox` must be owned by root and have mode `4755`.
+
+**Cause:** Electron uses a small set-user-ID sandbox helper on Linux. The custom system installer copied the unpacked Electron bundle while preserving the build user's ownership. Chromium refuses to start when this security-sensitive helper exists with unsafe ownership or permissions.
+
+**Immediate repair:**
+
+```bash
+sudo chown root:root /opt/lclip/chrome-sandbox
+sudo chmod 4755 /opt/lclip/chrome-sandbox
+ls -l /opt/lclip/chrome-sandbox
+/usr/local/bin/lclip --show
+```
+
+The permission display should begin with `-rwsr-xr-x` and show owner and group `root root`. Mode `4755` means the owner can execute the helper with the owner's identity while other users can only read and execute it.
+
+**Permanent installer solution:** After moving the application into `/opt/lclip`, the installer changes the entire bundle to `root:root` ownership and explicitly applies mode `4755` to `chrome-sandbox`.
+
+Do not work around this error with `--no-sandbox`, and do not apply `chmod 777`. Disabling Chromium's sandbox weakens LClip's renderer security; world-writable sandbox files are unsafe.
+
+### `Lclip virtual environment python not found at .../.venv/bin/python3`
+
+**Cause:** The shell is executing a launcher left behind by LClip's older Python implementation. The current LClip is an Electron application and does not use Python or a `.venv` directory. Pulling the new GitHub source does not automatically replace an old system launcher in `/usr/local/bin`.
+
+**Confirm the stale launcher:**
+
+```bash
+type -a lclip
+command -v lclip
+sed -n '1,20p' "$(command -v lclip)"
+```
+
+If that file refers to `.venv/bin/python3`, remove only the old launcher, update the repository, and run the current installer:
+
+```bash
+cd ~/Documents/Lclip
+git fetch origin
+git pull --ff-only origin main
+sudo rm -f /usr/local/bin/lclip
+chmod +x scripts/install-system.sh scripts/uninstall-system.sh
+./scripts/install-system.sh
+hash -r
+lclip --show
+```
+
+The new `/usr/local/bin/lclip` should contain an `exec /opt/lclip/lclip "$@"` command. If the current installer failed before its installation phase, an old launcher elsewhere in `PATH` can remain active. Check every match with `type -a lclip`, including `~/.local/bin/lclip`. If `git pull --ff-only` refuses because the checkout has local modifications, preserve those changes with a commit or backup before updating; do not use a destructive reset merely to bypass the warning.
+
 ### `lclip: command not found`
 
 **Cause:** The launcher was not installed or `/usr/local/bin` is not in the shell's `PATH`.
@@ -224,6 +309,19 @@ lclip --show
 
 Use `pkill` only when it is acceptable to stop the current LClip process. Restarting does not intentionally delete history.
 
+### The first window is slow, but later openings should be fast
+
+**Cause:** The first command starts the full Electron process and loads the renderer. LClip is designed to remain resident after graphical login; later `lclip --show` requests are forwarded to the existing process and should be much faster.
+
+**Solution:** Keep “Start after login” enabled. The window now waits until its renderer is ready before becoming visible, preventing a blank partial launch. Confirm that the resident process remains alive after hiding the picker:
+
+```bash
+pgrep -a lclip
+time /usr/local/bin/lclip --show
+```
+
+If every launch is cold, inspect whether a desktop cleanup tool is killing background processes or whether LClip is crashing after the window hides.
+
 ### Tray icon is missing on GNOME
 
 **Cause:** GNOME Shell does not always display traditional tray icons without an AppIndicator/status-icon extension.
@@ -258,6 +356,12 @@ Then open LClip Settings and read the integration card. If it says “Shortcut u
 5. If the portal presents a one-time request, approve only the declared `Super + .` shortcut.
 
 LClip intentionally does not fall back to `Super+V`, `Ctrl+V`, or another chord.
+
+On GNOME, the system installer also creates a native custom shortcut whose command is `/usr/local/bin/lclip --show` and whose binding is `<Super>period`. This provides an operating-system binding when Electron's Wayland portal registration is unavailable. Reinstall from an active GNOME session to configure it, or run:
+
+```bash
+node scripts/configure-gnome-shortcut.mjs
+```
 
 ### The shortcut works on X11 but not Wayland
 
@@ -314,9 +418,9 @@ The file should belong to the current user and normally have mode `-rw-------`. 
 
 ## 7. Automatic-paste failures
 
-### Selection copies but does not paste
+### Notification: “Automatic paste is unavailable. Press Ctrl+V to paste it.”
 
-This means clipboard writing worked but synthetic input did not. The notification and status bar should say that automatic paste is unavailable.
+This notification means clipboard writing succeeded but every available synthetic-input bridge failed. It does **not** mean that the selected history item was lost. Press normal `Ctrl+V` immediately in the previous application to confirm the value is present.
 
 **Checks:**
 
@@ -327,7 +431,31 @@ command -v wtype || true
 command -v xdotool || true
 ```
 
-Press `Ctrl+V` manually to confirm the selected value is on the clipboard.
+For a GNOME/KDE Wayland laptop, apply the supported LClip setup:
+
+```bash
+cd ~/Documents/Lclip
+pkill -x lclip 2>/dev/null || true
+./scripts/install-system.sh --configure-ydotool
+```
+
+Then **log out of the entire Linux desktop and log back in**. Do not merely close the terminal. Verify:
+
+```bash
+groups | tr ' ' '\n' | grep '^lclip-uinput$'
+ls -l /dev/uinput
+systemctl --user status ydotool.service --no-pager 2>/dev/null || \
+  systemctl --user status ydotoold.service --no-pager
+/usr/local/bin/lclip --show
+```
+
+Expected signals:
+
+- the current user belongs to `lclip-uinput`;
+- `/dev/uinput` has group `lclip-uinput` and mode equivalent to `0660`;
+- a `ydotool` or `ydotoold` user service is active, when supplied by the distribution.
+
+The picker intentionally hides before attempting paste so focus can return to the previous application. After a failed attempt, the status changes to “Copied · press Ctrl+V to paste” and a desktop notification is shown. The LClip process remains running and can be reopened with `Super + .` or `lclip --show`.
 
 ### `ydotool` is installed but paste fails
 
@@ -338,10 +466,12 @@ Press `Ctrl+V` manually to confirm the selected value is on the clipboard.
 ```bash
 systemctl status ydotool.service 2>/dev/null || true
 systemctl --user status ydotool.service 2>/dev/null || true
+systemctl --user status ydotoold.service 2>/dev/null || true
+groups
 ls -l /dev/uinput 2>/dev/null || true
 ```
 
-**Solution:** Follow the distribution package's documented service and permission setup. Avoid running the entire LClip application as root. Restart LClip after the bridge becomes available because bridge detection currently happens at application startup.
+**Solution:** Rerun `./scripts/install-system.sh --configure-ydotool`, log out, and log back in. Avoid running the entire LClip application as root. Do not use `chmod 666 /dev/uinput`; LClip's rule grants access only to `root` and the dedicated `lclip-uinput` group. Restart LClip after the bridge becomes available because bridge detection happens at application startup.
 
 ### `wtype` is installed but does not work
 
@@ -360,6 +490,12 @@ ls -l /dev/uinput 2>/dev/null || true
 **Cause:** Focus did not return quickly enough, another notification/window took focus, or the desktop has unusual focus behavior.
 
 **Workaround:** Select the item, then paste manually. For development, adjust and test the delay cautiously; increasing it makes pasting slower and does not guarantee correctness across every compositor.
+
+### The picker cannot be moved or returns to the center
+
+**Cause:** Earlier builds left only a very narrow draggable area around the search field and recalculated the centered position every time the picker opened.
+
+**Solution:** Current builds include a six-dot drag handle to the left of Search. Hold and drag that handle. LClip centers itself only for its first opening in a process and preserves the user-selected position afterward.
 
 ### Automatic paste suddenly stopped after installing a bridge
 

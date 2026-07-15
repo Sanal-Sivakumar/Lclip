@@ -20,6 +20,10 @@ let bridge = { id: "unavailable", label: "Checking paste support", automatic: fa
 let shortcutRegistered = false;
 let lastClipboard = "";
 let isQuitting = false;
+let rendererReady = false;
+let pendingShow = false;
+let hasPositionedWindow = false;
+let lastPasteOutcome = "";
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
@@ -34,6 +38,7 @@ function publicState() {
       shortcutLabel: "Super + .",
       pasteBridge: bridge.label,
       automaticPaste: bridge.automatic,
+      lastPasteOutcome,
       session: process.env.XDG_SESSION_TYPE || (process.platform === "linux" ? "unknown" : process.platform),
       desktop: process.env.XDG_CURRENT_DESKTOP || ""
     }
@@ -74,6 +79,10 @@ function createWindow() {
   window.setAlwaysOnTop(true, "pop-up-menu");
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   window.loadFile(rendererPath("index.html"));
+  window.once("ready-to-show", () => {
+    rendererReady = true;
+    if (pendingShow) showWindow();
+  });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\/(?:developers\.giphy\.com|giphy\.com)\//.test(url)) shell.openExternal(url);
     return { action: "deny" };
@@ -103,7 +112,15 @@ function positionWindow() {
 
 function showWindow() {
   if (!window || window.isDestroyed()) return;
-  positionWindow();
+  if (!rendererReady) {
+    pendingShow = true;
+    return;
+  }
+  pendingShow = false;
+  if (!hasPositionedWindow) {
+    positionWindow();
+    hasPositionedWindow = true;
+  }
   window.show();
   window.focus();
   window.webContents.send("lclip:open");
@@ -116,12 +133,11 @@ function toggleWindow() {
 
 function registerShortcut() {
   if (process.platform !== "linux") return false;
-  for (const accelerator of ["Super+.", "Super+Period"]) {
-    try {
-      if (globalShortcut.register(accelerator, toggleWindow)) return true;
-    } catch {}
+  try {
+    return globalShortcut.register("Super+.", showWindow);
+  } catch {
+    return false;
   }
-  return false;
 }
 
 function startClipboardMonitor() {
@@ -147,6 +163,7 @@ async function activateText(text) {
   window?.hide();
   await delay(150);
   const pasted = await pasteWithBridge(bridge);
+  lastPasteOutcome = pasted ? "Pasted into the previous application" : "Copied · press Ctrl+V to paste";
   if (!pasted && Notification.isSupported()) {
     new Notification({ title: "LClip copied the item", body: "Automatic paste is unavailable. Press Ctrl+V to paste it." }).show();
   }
@@ -183,6 +200,8 @@ async function activateGif(gif) {
     window?.hide();
     await delay(180);
     const pasted = await pasteWithBridge(bridge);
+    lastPasteOutcome = pasted ? "GIF pasted into the previous application" : "GIF copied · press Ctrl+V to paste";
+    broadcast();
     return { ok: true, pasted };
   } finally {
     clearTimeout(timeout);

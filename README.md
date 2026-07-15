@@ -29,6 +29,8 @@ LClip stays ready after graphical login. Press `Super + .` from any application 
 - [How LClip behaves](#how-lclip-behaves)
 - [Linux support](#linux-support)
 - [Install on Linux](#install-on-linux)
+- [Global shortcut integration](#global-shortcut-integration)
+- [Automatic paste on Wayland](#automatic-paste-on-wayland)
 - [Using LClip](#using-lclip)
 - [GIF search](#gif-search)
 - [Development](#development)
@@ -69,6 +71,8 @@ At startup, LClip asks Electron and the Linux desktop to register `Super + .` as
 - On Wayland, the request can be handled through the desktop's Global Shortcuts portal. Depending on the desktop and its security policy, a one-time approval dialog may appear.
 - If the chord is already owned by the desktop or another application, LClip shows the conflict in Settings and does not substitute another shortcut.
 
+On GNOME, the installer also creates a native desktop custom shortcut for the same `Super + .` chord. It executes `/usr/local/bin/lclip --show`, so the shortcut remains available even when Electron's Wayland portal registration is unavailable. It does not create `Super+V`, `Ctrl+V`, or any alternative binding.
+
 ### Selecting and pasting an item
 
 When an item is selected, LClip:
@@ -91,7 +95,7 @@ Recommended environment:
 - 64-bit Linux on x86-64 or ARM64
 - GNOME or KDE Plasma
 - Wayland or X11 graphical session
-- Node.js 20 or newer and npm for building from source
+- Node.js 22.12.0 or newer and npm for building from source
 - `sudo` for the system-wide installation step
 
 ## Install on Linux
@@ -101,7 +105,7 @@ Recommended environment:
 You need:
 
 - a 64-bit Linux laptop using x86-64 or ARM64;
-- Node.js 20 or newer with npm;
+- Node.js 22.12.0 or newer with npm;
 - an active graphical desktop session;
 - `sudo` permission for the system installation.
 
@@ -112,14 +116,42 @@ node --version
 npm --version
 ```
 
+The Node.js output must be `v22.12.0` or newer. Ubuntu's default Node.js 18 package is not sufficient for Electron 43.
+
+If Node 22 is not installed, one supported approach is NVM:
+
+```bash
+sudo apt update
+sudo apt install -y git curl
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
+source ~/.bashrc
+nvm install 22
+nvm use 22
+nvm alias default 22
+node --version
+```
+
+Review third-party installation scripts before executing them. Alternatively, install Node.js 22 through a trusted package source provided for your distribution.
+
 ### Guided system installation
 
-Clone the repository and run the included installer:
+Clone the repository:
 
 ```bash
 git clone --depth 1 https://github.com/Sanal-Sivakumar/Lclip.git
 cd Lclip
 chmod +x scripts/install-system.sh scripts/uninstall-system.sh
+```
+
+For GNOME or KDE on Wayland, use the recommended installation command below. It installs LClip and configures restricted access to Linux's virtual-input device so selecting an item can automatically paste it:
+
+```bash
+./scripts/install-system.sh --configure-ydotool
+```
+
+For X11, or when you want to configure input automation yourself, use:
+
+```bash
 ./scripts/install-system.sh
 ```
 
@@ -133,15 +165,22 @@ The installer performs the complete setup:
 6. Installs the application under `/opt/lclip`.
 7. Creates the `lclip` terminal command and application-menu entry.
 8. Adds graphical-login autostart for supported desktop environments.
-9. Attempts to install an automatic-paste bridge using `apt`, `dnf`, `pacman`, or `zypper`.
+9. Configures the native `Super + .` custom shortcut when installing from a GNOME session.
+10. Attempts to install and start an automatic-paste bridge using `apt`, `dnf`, `pacman`, or `zypper`.
+11. With `--configure-ydotool`, creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
 
-When installation finishes, start LClip immediately:
+> [!IMPORTANT]
+> After using `--configure-ydotool`, **log out of Linux completely and log back in**. Opening a new terminal is not enough. Linux applies the new `lclip-uinput` group membership only to a new login session.
+
+After logging back in, confirm the environment and start LClip:
 
 ```bash
+groups | tr ' ' '\n' | grep '^lclip-uinput$'
+systemctl --user status ydotool.service --no-pager 2>/dev/null || true
 lclip --show
 ```
 
-Press `Super + .` to confirm that the global picker opens. LClip will start in the background automatically after the next graphical login.
+Press `Super + .` to confirm that the global picker opens. Open a text editor, copy two different pieces of text, select the older one in LClip, and confirm that it is pasted into the editor. LClip starts in the background automatically after graphical login.
 
 > [!NOTE]
 > Wayland may show a one-time desktop approval for the global shortcut. That permission belongs to GNOME/KDE and is not requested every time the picker opens.
@@ -156,6 +195,15 @@ If you want to configure `ydotool`, `wtype`, or `xdotool` yourself:
 
 LClip will still copy selected values to the clipboard. Until a supported bridge is available, press normal `Ctrl+V` to paste the selected value.
 
+### Installer options
+
+| Command | Result |
+| --- | --- |
+| `./scripts/install-system.sh --configure-ydotool` | Recommended Wayland installation with restricted `/dev/uinput` access; requires logout/login |
+| `./scripts/install-system.sh` | Standard installation with best-effort bridge package and service setup |
+| `./scripts/install-system.sh --skip-input-bridge` | Installs LClip without installing or configuring input tools |
+| `./scripts/install-system.sh --help` | Prints available installer options |
+
 ### Installed locations
 
 | Location | Purpose |
@@ -165,6 +213,58 @@ LClip will still copy selected values to the clipboard. Until a supported bridge
 | `/usr/share/applications/io.lclip.LClip.desktop` | Application-menu entry |
 | `/usr/share/icons/hicolor/scalable/apps/io.lclip.LClip.svg` | System application icon |
 | `/etc/xdg/autostart/io.lclip.LClip.desktop` | Starts LClip after graphical login |
+| `/etc/udev/rules.d/80-lclip-uinput.rules` | Optional restricted `/dev/uinput` rule created by `--configure-ydotool` |
+
+## Global shortcut integration
+
+`Super + .` means: hold the Windows-logo key, press the normal period/full-stop key beside the comma, and release both.
+
+LClip uses two compatible registration paths:
+
+1. **Electron global shortcut** — direct registration on X11 or the Global Shortcuts portal on compatible Wayland desktops.
+2. **GNOME native shortcut** — installed through `gsettings` with command `/usr/local/bin/lclip --show` and binding `<Super>period`.
+
+The native GNOME shortcut is created by `scripts/configure-gnome-shortcut.mjs`. Existing GNOME custom shortcuts are preserved. The uninstaller removes only LClip's entry.
+
+Verify the GNOME entry with:
+
+```bash
+gsettings get org.gnome.settings-daemon.plugins.media-keys.custom-keybindings
+```
+
+On KDE Plasma, Electron uses the Wayland portal when supported. If the desktop asks once for approval, approve only `Super + .`.
+
+## Automatic paste on Wayland
+
+Copying a value to the clipboard and injecting `Ctrl+V` into another application are separate operations. Wayland deliberately restricts synthetic keyboard input.
+
+LClip attempts the installed bridges in this order:
+
+1. `ydotool`, using Linux `/dev/uinput` through the `ydotoold` service;
+2. `wtype`, when the Wayland compositor supports its virtual-keyboard protocol;
+3. `xdotool`, for X11 or compatible Xwayland targets.
+
+If one bridge fails, LClip tries the next. If all fail, the selected item remains on the clipboard, the picker hides to restore focus, and LClip reports **“Copied · press Ctrl+V to paste.”** This is a safe fallback rather than data loss.
+
+For reliable `ydotool` operation, install with:
+
+```bash
+./scripts/install-system.sh --configure-ydotool
+```
+
+Then log out and back in. Do not use `chmod 666 /dev/uinput`, do not run the entire LClip application as root, and do not disable Electron's sandbox.
+
+### Update or reinstall
+
+```bash
+cd ~/Documents/Lclip
+git pull --ff-only origin main
+pkill -x lclip 2>/dev/null || true
+rm -rf node_modules dist
+./scripts/install-system.sh --configure-ydotool
+```
+
+Log out and back in if the installer created or changed the `lclip-uinput` membership. Existing LClip history is preserved during reinstall.
 
 ### Why LClip is not a root boot daemon
 

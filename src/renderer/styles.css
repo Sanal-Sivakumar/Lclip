@@ -97,6 +97,17 @@ button { color: inherit; }
   padding: 10px 12px 10px 18px;
   -webkit-app-region: drag;
 }
+.drag-handle {
+  display: grid;
+  grid-template-columns: repeat(2, 3px);
+  gap: 3px;
+  flex: 0 0 auto;
+  padding: 10px 5px;
+  cursor: grab;
+  -webkit-app-region: drag;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle i { width: 3px; height: 3px; border-radius: 50%; background: var(--dim); opacity: 0.78; }
 .search-wrap {
   display: flex;
   align-items: center;
