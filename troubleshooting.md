@@ -13,6 +13,7 @@ This document records the important development problems addressed in LClip and 
 | First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
 | Picker disappeared after selection | It hides intentionally to restore previous-app focus | Persistent process, reliable shortcut reopening, notification, and recorded paste outcome |
 | “Automatic paste is unavailable” | Bridge executable existed but its service/protocol/device permission failed | Ordered bridge fallback and optional restricted `ydotool` `/dev/uinput` configuration |
+| Selecting history typed digits such as `2442` | Ubuntu ydotool 0.1.8 received the incompatible ydotool 1.x numeric event syntax | Runtime version detection selects symbolic `ctrl+v` for 0.x and numeric events for 1.x |
 | Window was difficult to move and re-centered | Search covered most of the drag region; every show repositioned it | Visible six-dot drag handle and one-time centering per process |
 
 ## 1. Quick diagnosis
@@ -527,6 +528,24 @@ After login:
 groups | tr ' ' '\n' | grep '^lclip-uinput$'
 systemctl --user status lclip-ydotoold.service --no-pager
 ```
+
+### Selecting an item types numbers such as `2442`
+
+**Cause:** Ubuntu 24.04 ships ydotool 0.1.8. Its `key` subcommand expects symbolic combinations such as `ctrl+v`. Ydotool 1.x changed to numeric input-event sequences. Earlier LClip builds always sent the 1.x sequence; ydotool 0.1.8 interpreted those arguments as typing input and could produce digits instead of pasting.
+
+**Implemented solution:** LClip now identifies the installed ydotool syntax at startup. Version 0.x receives `ydotool key ctrl+v`; version 1.x receives explicit press/release events.
+
+Update and reinstall LClip:
+
+```bash
+cd ~/Documents/Lclip
+git pull --ff-only origin main
+pkill -x lclip 2>/dev/null || true
+./scripts/install-system.sh --configure-ydotool
+sudo reboot
+```
+
+Do not attempt to fix this by changing random Linux key codes. The Ctrl and V codes were correct for ydotool 1.x; the installed 0.1.8 command grammar was different.
 
 ### `wtype` is installed but does not work
 

@@ -12,6 +12,42 @@ async function fakeExecutable(directory, name, exitCode = 0) {
   return path;
 }
 
+async function fakeLegacyYdotool(directory) {
+  const path = join(directory, "ydotool");
+  await writeFile(path, `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "ydotool 0.1.8"
+  exit 0
+fi
+if [ "$1" = "key" ] && [ "$2" = "--help" ]; then
+  echo "Press keys such as ctrl+alt+f1"
+  exit 0
+fi
+if [ "$1" = "key" ] && [ "$2" = "ctrl+v" ]; then
+  exit 0
+fi
+exit 1
+`);
+  await chmod(path, 0o755);
+  return path;
+}
+
+async function fakeModernYdotool(directory) {
+  const path = join(directory, "ydotool");
+  await writeFile(path, `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "ydotool v1.0.4"
+  exit 0
+fi
+if [ "$1" = "key" ] && [ "$2" = "29:1" ] && [ "$3" = "47:1" ] && [ "$4" = "47:0" ] && [ "$5" = "29:0" ]; then
+  exit 0
+fi
+exit 1
+`);
+  await chmod(path, 0o755);
+  return path;
+}
+
 test("ydotool is preferred for a Wayland session", async () => {
   const directory = await mkdtemp(join(tmpdir(), "lclip-"));
   await fakeExecutable(directory, "ydotool");
@@ -40,5 +76,21 @@ test("paste falls back when the preferred bridge fails", async () => {
   await fakeExecutable(directory, "ydotool", 1);
   await fakeExecutable(directory, "wtype", 0);
   const bridge = await detectPasteBridge({ PATH: directory, XDG_SESSION_TYPE: "wayland" }, "linux");
+  assert.equal(await pasteWithBridge(bridge), true);
+});
+
+test("ydotool 0.x uses symbolic ctrl+v instead of numeric key events", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lclip-"));
+  await fakeLegacyYdotool(directory);
+  const bridge = await detectPasteBridge({ PATH: directory, XDG_SESSION_TYPE: "wayland" }, "linux");
+  assert.equal(bridge.syntax, "legacy-symbolic");
+  assert.equal(await pasteWithBridge(bridge), true);
+});
+
+test("ydotool 1.x uses explicit keycode press and release events", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lclip-"));
+  await fakeModernYdotool(directory);
+  const bridge = await detectPasteBridge({ PATH: directory, XDG_SESSION_TYPE: "wayland" }, "linux");
+  assert.equal(bridge.syntax, "keycodes");
   assert.equal(await pasteWithBridge(bridge), true);
 });

@@ -247,7 +247,14 @@ Writing to the clipboard and causing another app to paste are separate operation
 
 ### ydotool
 
-`ydotool` can inject Linux input through the kernel's `uinput` mechanism and is LClip's first choice. Current ydotool versions require the `ydotoold` daemon or distribution-provided service and appropriate access to `/dev/uinput`. LClip sends Linux key codes 29 and 47 for Ctrl and V. Installing the executable alone is not sufficient if the daemon or device permission is unavailable.
+`ydotool` can inject Linux input through the kernel's `uinput` mechanism and is LClip's first choice. Current ydotool versions require the `ydotoold` daemon or distribution-provided service and appropriate access to `/dev/uinput`. Installing the executable alone is not sufficient if the daemon or device permission is unavailable.
+
+The `key` command changed incompatibly at ydotool 1.0:
+
+- Ubuntu's ydotool 0.1.8 accepts symbolic combinations, so LClip invokes `ydotool key ctrl+v`.
+- ydotool 1.x accepts Linux input-event codes, so LClip invokes `ydotool key 29:1 47:1 47:0 29:0`, where 29 is left Ctrl and 47 is V.
+
+During detection, LClip inspects `ydotool --version` and `ydotool key --help`. An identified major version 1 or explicit key-code help selects numeric syntax; version 0 or unknown output selects the safer symbolic syntax. Using symbolic syntax on an incompatible modern client fails and permits bridge fallback, whereas sending numeric syntax to 0.1.8 can type unwanted digits while still exiting successfully.
 
 ### `/dev/uinput`, udev, and the `lclip-uinput` group
 
@@ -386,8 +393,9 @@ The installer rejects conflicting or unknown options. It must be invoked as the 
 - `wtype` is selected on Wayland when needed;
 - missing bridges are reported as unavailable.
 - paste falls back to the next candidate when the preferred bridge exits with an error.
+- ydotool 0.x uses symbolic `ctrl+v` rather than the incompatible 1.x numeric event sequence.
 
-The current suite contains seven tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
+The current suite contains nine tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
 
 ## 11. Known boundaries
 

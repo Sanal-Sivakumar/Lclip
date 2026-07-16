@@ -250,6 +250,8 @@ LClip attempts the installed bridges in this order:
 
 If one bridge fails, LClip tries the next. If all fail, the selected item remains on the clipboard, the picker hides to restore focus, and LClip reports **“Copied · press Ctrl+V to paste.”** This is a safe fallback rather than data loss.
 
+Ubuntu 24.04 currently supplies `ydotool 0.1.8`, which uses symbolic shortcuts such as `ydotool key ctrl+v`. Modern ydotool 1.x uses explicit Linux key-code press/release events. LClip detects the installed syntax: it sends symbolic `ctrl+v` to 0.x and numeric key events to 1.x. This prevents old versions from typing digits instead of pasting.
+
 For reliable `ydotool` operation, install with:
 
 ```bash
