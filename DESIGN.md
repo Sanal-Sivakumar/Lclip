@@ -6,9 +6,9 @@ Late-night desktop utility under soft monitor light: dark neutral depth, restrai
 
 ## Color
 
-- Background: `oklch(0.08 0 0 / 0.82)`
-- Material: `oklch(0.18 0.012 230 / 0.76)`
-- Raised material: `oklch(0.23 0.014 230 / 0.90)`
+- Background: `oklch(0.105 0.008 240 / 0.94)`
+- Material: `oklch(0.18 0.014 235 / 0.90)`
+- Raised material: `oklch(0.23 0.014 230 / 0.96)`
 - Ink: `oklch(0.96 0.006 230)`
 - Muted ink: `oklch(0.74 0.018 230)`
 - Primary cobalt: `oklch(0.75 0.08 230)`
@@ -18,22 +18,24 @@ Late-night desktop utility under soft monitor light: dark neutral depth, restrai
 
 ## Typography
 
-Use the Linux system UI stack: `system-ui`, Ubuntu, Cantarell, Noto Sans, and sans-serif. Use one compact scale from 12px metadata to 20px picker title. Monospace is reserved for keyboard chords and diagnostic values.
+Use the Linux system UI stack: `system-ui`, Ubuntu, Cantarell, Noto Sans, and sans-serif. Emoji glyphs prefer `Noto Color Emoji`. Use one compact scale from 9px metadata to 19px picker title. Monospace is reserved for keyboard chords, kaomoji, and diagnostic values.
 
 ## Shape and Layout
 
-The picker is a compact 760x560 floating utility with 14–16px structural radii and full-pill treatment only for segmented filters and status chips. A narrow tab rail anchors the left edge; search and results occupy the main surface. Content remains dense, scannable, and free of nested cards.
+The picker is a compact 700x510 floating utility with 11–16px structural radii and full-pill treatment only for tiny status indicators. A narrow tab rail anchors the left edge. A 28px clear drag strip sits above Search; bounded, independently scrolling results occupy the remaining surface. Content remains dense, scannable, and free of nested cards.
 
 ## Materials
 
-Use one primary translucent window material, an opaque-enough result surface, a fine internal highlight, and a restrained background blur where supported. Never stack multiple decorative glass panels. In high-contrast or reduced-transparency environments, switch to an opaque near-black surface.
+Use one mostly opaque translucent window material, a fine internal highlight, and restrained background blur where supported. The wallpaper may tint the material but must not compete with labels or results. Never stack multiple decorative glass panels. In high-contrast or reduced-transparency environments, switch to an opaque near-black surface.
 
 ## Components
 
 - Global search field with shortcut hint and immediate filtering
+- Full-width titlebar drag strip with an excluded top-right close control
 - Vertical mode rail for Clipboard, Emoji, Kaomoji, GIFs, and Symbols
 - Clipboard rows with preview, source time, copy number, and destructive removal action
 - Character grids with large glyph, searchable name, and category filter
+- Independent vertical scroll regions for every long mode and Settings
 - GIF masonry with explicit GIPHY attribution, loading, offline, and missing-key states
 - Footer status showing capture state, item count, navigation keys, and paste capability
 - Inline settings sheet for launch-at-login, history pause, shortcut status, and GIPHY key

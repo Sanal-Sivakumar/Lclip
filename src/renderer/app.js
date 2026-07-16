@@ -1,3 +1,5 @@
+import { emoji, kaomoji, symbols } from "./catalog.js";
+
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
@@ -45,50 +47,6 @@ const modes = {
   gifs: { title: "GIFs", description: "Search GIPHY and paste a reaction into supported apps.", placeholder: "Search GIFs" },
   symbols: { title: "Special characters", description: "Useful arrows, currency, mathematics, punctuation, and technical symbols.", placeholder: "Search special characters" }
 };
-
-const emoji = [
-  ["😀", "grinning face", "smileys"], ["😃", "happy face", "smileys"], ["😄", "smiling eyes", "smileys"], ["😁", "beaming face", "smileys"],
-  ["😂", "tears of joy", "smileys"], ["🥹", "holding back tears", "smileys"], ["😊", "warm smile", "smileys"], ["😌", "relieved face", "smileys"],
-  ["😍", "heart eyes", "smileys"], ["🥰", "smiling hearts", "smileys"], ["😘", "kiss", "smileys"], ["😎", "sunglasses", "smileys"],
-  ["🤓", "nerd face", "smileys"], ["🫡", "salute", "smileys"], ["🤔", "thinking", "smileys"], ["🫠", "melting face", "smileys"],
-  ["😴", "sleeping", "smileys"], ["😭", "crying", "smileys"], ["😤", "triumph", "smileys"], ["😡", "angry", "smileys"],
-  ["👍", "thumbs up", "gestures"], ["👎", "thumbs down", "gestures"], ["👏", "clapping hands", "gestures"], ["🙌", "raising hands", "gestures"],
-  ["🤝", "handshake", "gestures"], ["🙏", "folded hands", "gestures"], ["✌️", "victory hand", "gestures"], ["🤞", "crossed fingers", "gestures"],
-  ["👌", "okay hand", "gestures"], ["🫶", "heart hands", "gestures"], ["💪", "strong arm", "gestures"], ["👀", "eyes", "gestures"],
-  ["❤️", "red heart", "symbols"], ["🩷", "pink heart", "symbols"], ["🧡", "orange heart", "symbols"], ["💛", "yellow heart", "symbols"],
-  ["💚", "green heart", "symbols"], ["💙", "blue heart", "symbols"], ["💜", "purple heart", "symbols"], ["✨", "sparkles", "symbols"],
-  ["🔥", "fire", "symbols"], ["💯", "hundred points", "symbols"], ["✅", "check mark", "symbols"], ["❌", "cross mark", "symbols"],
-  ["🎉", "party popper", "objects"], ["🎁", "gift", "objects"], ["🚀", "rocket", "objects"], ["💡", "light bulb", "objects"],
-  ["💻", "laptop", "objects"], ["📌", "pushpin", "objects"], ["📝", "memo", "objects"], ["🔒", "lock", "objects"],
-  ["🐶", "dog", "nature"], ["🐱", "cat", "nature"], ["🐼", "panda", "nature"], ["🦊", "fox", "nature"],
-  ["🌱", "seedling", "nature"], ["🌻", "sunflower", "nature"], ["🌙", "moon", "nature"], ["⭐", "star", "nature"]
-].map(([value, name, category]) => ({ value, name, category }));
-
-const kaomoji = [
-  ["(＾▽＾)", "happy"], ["(◕‿◕)", "smile"], ["(｡♥‿♥｡)", "love"], ["(づ｡◕‿‿◕｡)づ", "hug"],
-  ["¯\\_(ツ)_/¯", "shrug"], ["(╯°□°）╯︵ ┻━┻", "table flip"], ["┬─┬ ノ( ゜-゜ノ)", "table restore"], ["ಠ_ಠ", "disapproval"],
-  ["(¬‿¬)", "smirk"], ["(•̀ᴗ•́)و ̑̑", "you can do it"], ["ᕦ(ò_óˇ)ᕤ", "strong"], ["(ง'̀-'́)ง", "fight"],
-  ["(っ˘ڡ˘ς)", "delicious"], ["(－‸ლ)", "facepalm"], ["(ಥ﹏ಥ)", "crying"], ["(；一_一)", "suspicious"],
-  ["ʕ•ᴥ•ʔ", "bear"], ["ฅ^•ﻌ•^ฅ", "cat"], ["U・ᴥ・U", "dog"], ["くコ:彡", "squid"],
-  ["♪~ ᕕ(ᐛ)ᕗ", "dancing"], ["(☞ﾟヮﾟ)☞", "finger guns"], ["☜(ﾟヮﾟ☜)", "finger guns left"], ["(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧", "magic"],
-  ["(￣▽￣)ノ", "hello"], ["( ^_^)／", "wave"], ["(-_-)/~~~", "goodbye"], ["(￣o￣) zzZZzzZZ", "sleep"],
-  ["(⊙_⊙)", "surprised"], ["(⊙﹏⊙)", "worried"], ["(⌐■_■)", "deal with it"], ["(｡•́︿•̀｡)", "sad"]
-].map(([value, name]) => ({ value, name, category: "all" }));
-
-const symbols = [
-  ["→", "right arrow", "arrows"], ["←", "left arrow", "arrows"], ["↑", "up arrow", "arrows"], ["↓", "down arrow", "arrows"],
-  ["↔", "left right arrow", "arrows"], ["↗", "up right arrow", "arrows"], ["↘", "down right arrow", "arrows"], ["⇒", "double right arrow", "arrows"],
-  ["€", "euro", "currency"], ["£", "pound", "currency"], ["¥", "yen", "currency"], ["₹", "rupee", "currency"],
-  ["₿", "bitcoin", "currency"], ["¢", "cent", "currency"], ["₽", "ruble", "currency"], ["₩", "won", "currency"],
-  ["±", "plus minus", "math"], ["×", "multiply", "math"], ["÷", "divide", "math"], ["≈", "approximately", "math"],
-  ["≠", "not equal", "math"], ["≤", "less or equal", "math"], ["≥", "greater or equal", "math"], ["∞", "infinity", "math"],
-  ["√", "square root", "math"], ["∑", "sum", "math"], ["∫", "integral", "math"], ["π", "pi", "math"],
-  ["©", "copyright", "legal"], ["®", "registered", "legal"], ["™", "trademark", "legal"], ["§", "section", "legal"],
-  ["•", "bullet", "punctuation"], ["…", "ellipsis", "punctuation"], ["—", "em dash", "punctuation"], ["–", "en dash", "punctuation"],
-  ["“", "left double quote", "punctuation"], ["”", "right double quote", "punctuation"], ["‘", "left single quote", "punctuation"], ["’", "right single quote", "punctuation"],
-  ["°", "degree", "technical"], ["µ", "micro", "technical"], ["Ω", "omega ohm", "technical"], ["⌘", "command", "technical"],
-  ["⌥", "option", "technical"], ["⌫", "delete", "technical"], ["⏎", "return", "technical"], ["⎋", "escape", "technical"]
-].map(([value, name, category]) => ({ value, name, category }));
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -142,6 +100,7 @@ function render() {
 
 function renderHeadingActions() {
   const container = $("#headingActions");
+  container.classList.remove("category-actions");
   container.replaceChildren();
   if (state.mode === "clipboard") {
     const pause = element("button", "quiet-action", state.data.settings.captureEnabled ? "Pause capture" : "Resume capture");
@@ -152,8 +111,9 @@ function renderHeadingActions() {
     container.append(pause, clear);
     return;
   }
-  const source = state.mode === "emoji" ? emoji : state.mode === "symbols" ? symbols : [];
+  const source = state.mode === "emoji" ? emoji : state.mode === "kaomoji" ? kaomoji : state.mode === "symbols" ? symbols : [];
   if (!source.length) return;
+  container.classList.add("category-actions");
   const categories = ["all", ...new Set(source.map(item => item.category))];
   categories.forEach(category => {
     const button = element("button", `category-chip${state.category === category ? " active" : ""}`, category[0].toUpperCase() + category.slice(1));
@@ -343,7 +303,6 @@ async function saveSettings() {
     autostartEnabled: $("#autostartSetting").checked,
     giphyApiKey: $("#giphyKey").value,
     gifRating: $("#gifRating").value,
-    closeAfterPaste: true
   });
   if ($("#captureSetting").checked !== state.data.settings.captureEnabled) state.data = await api.setCapture($("#captureSetting").checked);
   closeSettings();

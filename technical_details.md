@@ -97,7 +97,7 @@ Linux can also have a primary selection, commonly pasted with the middle mouse b
 
 ### Focus
 
-The focused application receives keyboard input. When LClip opens, it temporarily becomes focused. Before automatic paste, it hides and waits 150 milliseconds so the previous application can become active again. This short delay reduces the chance that the generated paste is delivered to LClip itself.
+The focused application receives keyboard input. When LClip opens, it temporarily becomes focused. Before automatic paste, it hides and waits 150 milliseconds so the previous application can become active again. This short delay reduces the chance that the generated paste is delivered to LClip itself. After the paste bridge finishes, LClip leaves an additional 80-millisecond settling interval before restoring the picker for another selection. A normal focus loss caused by clicking outside still dismisses it.
 
 ## 3. Why LClip starts after login
 
@@ -168,7 +168,7 @@ This separation prevents UI code from receiving unrestricted filesystem or proce
 
 ### Renderer process
 
-`src/renderer/index.html`, `styles.css`, and `app.js` create the interface. The renderer contains the built-in emoji, kaomoji, and symbol data. It filters lists, responds to mouse and keyboard navigation, displays status, and asks the main process to perform privileged actions.
+`src/renderer/index.html`, `styles.css`, `app.js`, and `catalog.js` create the interface. The catalog contains over 200 emoji, over 60 kaomoji, and over 100 symbols. The renderer filters these offline lists, responds to mouse and keyboard navigation, displays status, and asks the main process to perform privileged actions.
 
 The renderer cannot import Node.js modules because `nodeIntegration` is disabled.
 
@@ -184,9 +184,19 @@ This is safer than exposing all of Electron. The renderer can request an approve
 
 ### BrowserWindow
 
-The picker is an Electron `BrowserWindow` configured as frameless, transparent, always on top, absent from the taskbar, visible on every workspace, and hidden when it loses focus. The visual “glass” comes from translucent CSS layers, borders, shadows, and blur-capable compositing. Actual appearance can differ with compositor support, GPU drivers, and accessibility settings.
+The picker is a 700x510 Electron `BrowserWindow` configured as frameless, transparent, always on top, absent from the taskbar, visible on every workspace, and hidden when it loses focus. The visual “glass” comes from a mostly opaque tinted base, one translucent highlight layer, and compositor blur. The higher base opacity prevents detailed wallpaper from competing with text while still retaining environmental color. Actual appearance can differ with compositor support, GPU drivers, and accessibility settings.
 
-The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A visible six-dot region uses Electron's `-webkit-app-region: drag` behavior; after the user drags the window, later openings preserve that position instead of forcing it back to the center.
+The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 28-pixel strip above Search uses the standard `app-region: drag` behavior plus Electron's `-webkit-app-region: drag` compatibility form. The close button and Search are explicitly `no-drag`, so they still receive clicks. After the user drags the window, later openings preserve that position instead of forcing it back to the center.
+
+### Scroll containment
+
+The picker itself never grows to fit a long catalog. CSS Grid gives the content area a `minmax(0, 1fr)` results row, and the results element uses `overflow-y: auto`, `min-height: 0`, and contained overscroll. This combination is important: without `min-height: 0`, a grid child can keep its content-based minimum size and prevent the inner scrollbar from becoming usable. Settings has its own equivalent scroll container, while category chips share a dedicated row and wrap on narrow layouts.
+
+### Emoji rendering and content references
+
+Emoji are Unicode character sequences, not image files bundled by LClip. CSS requests `Noto Color Emoji` first on Linux, followed by Apple Color Emoji and Segoe UI Emoji as cross-platform development fallbacks. If the preferred font is absent or does not contain a new sequence, Chromium uses the operating system's configured fallback font.
+
+Names and grouping use common Unicode/CLDR terminology. The catalog was broadened with the [Unicode Emoji Charts](https://unicode.org/emoji/charts/) and Google's open-source [Noto Emoji project](https://github.com/googlefonts/noto-emoji) as references. Microsoft's documented emoji-panel interaction—search, modes for emoji/GIF/kaomoji/symbols/history, arrow navigation, and Enter to insert—was used as a usability reference, not as copied artwork or source code: [Microsoft keyboard and text tools](https://support.microsoft.com/en-us/accessibility/windows/use-a-screen-reader-to-explore-and-navigate-different-keyboard-and-text-tools-in-windows).
 
 ### Tray
 
@@ -228,7 +238,8 @@ The first process start is a **cold start** because Electron and the renderer mu
 4. The value is also moved to the front of history.
 5. The window hides and waits 150 milliseconds.
 6. The paste bridge sends `Ctrl+V`; if it fails, the next detected bridge is attempted.
-7. If every bridge fails, LClip leaves the value copied, displays a notification, and records “Copied · press Ctrl+V to paste” for the status bar.
+7. After an 80-millisecond focus-settling interval, LClip restores the picker at its preserved position for another selection.
+8. If every bridge fails, LClip leaves the value copied, displays a notification, and records “Copied · press Ctrl+V to paste” for the status bar.
 
 ### GIF flow
 
@@ -302,7 +313,6 @@ The JSON state contains:
 - `history`: up to 10 objects containing an ID, text, and creation time;
 - `captureEnabled`: whether new clipboard text is collected;
 - `autostartEnabled`: the UI's autostart setting;
-- `closeAfterPaste`: reserved behavior currently saved as true;
 - `giphyApiKey`: the optional API key;
 - `gifRating`: `g`, `pg`, or `pg-13`.
 
@@ -394,8 +404,9 @@ The installer rejects conflicting or unknown options. It must be invoked as the 
 - missing bridges are reported as unavailable.
 - paste falls back to the next candidate when the preferred bridge exits with an error.
 - ydotool 0.x uses symbolic `ctrl+v` rather than the incompatible 1.x numeric event sequence.
+- the offline emoji, kaomoji, and symbol catalogs meet their minimum sizes, contain searchable metadata, and do not duplicate values.
 
-The current suite contains nine tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
+The current suite contains ten tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
 
 ## 11. Known boundaries
 

@@ -39,7 +39,6 @@ export class StateStore {
       settings: {
         captureEnabled: true,
         autostartEnabled: true,
-        closeAfterPaste: true,
         giphyApiKey: "",
         gifRating: "pg"
       }
@@ -51,7 +50,13 @@ export class StateStore {
     try {
       const parsed = JSON.parse(await readFile(this.path, "utf8"));
       this.state.history = normalizeHistory(parsed.history);
-      this.state.settings = { ...this.state.settings, ...(parsed.settings || {}) };
+      const saved = parsed.settings || {};
+      this.state.settings = {
+        captureEnabled: typeof saved.captureEnabled === "boolean" ? saved.captureEnabled : this.state.settings.captureEnabled,
+        autostartEnabled: typeof saved.autostartEnabled === "boolean" ? saved.autostartEnabled : this.state.settings.autostartEnabled,
+        giphyApiKey: typeof saved.giphyApiKey === "string" ? saved.giphyApiKey.trim().slice(0, 180) : "",
+        gifRating: ["g", "pg", "pg-13"].includes(saved.gifRating) ? saved.gifRating : "pg"
+      };
     } catch {}
     return this.snapshot();
   }

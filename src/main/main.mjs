@@ -24,6 +24,7 @@ let rendererReady = false;
 let pendingShow = false;
 let hasPositionedWindow = false;
 let lastPasteOutcome = "";
+let activationInProgress = false;
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
@@ -51,10 +52,10 @@ function broadcast() {
 
 function createWindow() {
   window = new BrowserWindow({
-    width: 760,
-    height: 560,
-    minWidth: 620,
-    minHeight: 480,
+    width: 700,
+    height: 510,
+    minWidth: 580,
+    minHeight: 420,
     show: false,
     frame: false,
     transparent: true,
@@ -95,7 +96,7 @@ function createWindow() {
     }
   });
   window.on("blur", () => {
-    if (window?.isVisible() && !window.webContents.isDevToolsOpened()) window.hide();
+    if (window?.isVisible() && !activationInProgress && !window.webContents.isDevToolsOpened()) window.hide();
   });
 }
 
@@ -154,15 +155,27 @@ function startClipboardMonitor() {
   monitor.unref?.();
 }
 
+async function pasteIntoPreviousApp(waitMilliseconds) {
+  const reopenPicker = Boolean(window?.isVisible());
+  activationInProgress = true;
+  window?.hide();
+  try {
+    await delay(waitMilliseconds);
+    return await pasteWithBridge(bridge);
+  } finally {
+    await delay(80);
+    activationInProgress = false;
+    if (reopenPicker) showWindow();
+  }
+}
+
 async function activateText(text) {
   const value = String(text || "").slice(0, 50_000);
   if (!value.trim()) return { ok: false, pasted: false };
   clipboard.writeText(value);
   lastClipboard = value;
   store.update(state => { state.history = addHistoryItem(state.history, value); });
-  window?.hide();
-  await delay(150);
-  const pasted = await pasteWithBridge(bridge);
+  const pasted = await pasteIntoPreviousApp(150);
   lastPasteOutcome = pasted ? "Pasted into the previous application" : "Copied · press Ctrl+V to paste";
   if (!pasted && Notification.isSupported()) {
     new Notification({ title: "LClip copied the item", body: "Automatic paste is unavailable. Press Ctrl+V to paste it." }).show();
@@ -197,9 +210,7 @@ async function activateGif(gif) {
       ...(image.isEmpty() ? {} : { image })
     });
     lastClipboard = url;
-    window?.hide();
-    await delay(180);
-    const pasted = await pasteWithBridge(bridge);
+    const pasted = await pasteIntoPreviousApp(180);
     lastPasteOutcome = pasted ? "GIF pasted into the previous application" : "GIF copied · press Ctrl+V to paste";
     broadcast();
     return { ok: true, pasted };
@@ -302,7 +313,6 @@ function registerIpc() {
   });
   ipcMain.handle("lclip:save-settings", async (_event, settings) => {
     const allowed = {
-      closeAfterPaste: Boolean(settings?.closeAfterPaste),
       autostartEnabled: Boolean(settings?.autostartEnabled),
       giphyApiKey: String(settings?.giphyApiKey || "").trim().slice(0, 180),
       gifRating: ["g", "pg", "pg-13"].includes(settings?.gifRating) ? settings.gifRating : "pg"

@@ -11,10 +11,12 @@ This document records the important development problems addressed in LClip and 
 | Electron aborted on `chrome-sandbox` | Helper ownership/mode was unsafe after copying | Installer applies `root:root` ownership and mode `4755` |
 | `Super + .` did not open the picker | Electron/Wayland portal registration was unavailable or conflicted | GNOME-native custom shortcut plus Electron registration of the same chord |
 | First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
-| Picker disappeared after selection | It hides intentionally to restore previous-app focus | Persistent process, reliable shortcut reopening, notification, and recorded paste outcome |
+| Picker disappeared after one selection | Earlier activation hid the picker permanently after yielding focus for paste | Paste now yields focus briefly and restores the picker for repeated selections |
 | “Automatic paste is unavailable” | Bridge executable existed but its service/protocol/device permission failed | Ordered bridge fallback and optional restricted `ydotool` `/dev/uinput` configuration |
 | Selecting history typed digits such as `2442` | Ubuntu ydotool 0.1.8 received the incompatible ydotool 1.x numeric event syntax | Runtime version detection selects symbolic `ctrl+v` for 0.x and numeric events for 1.x |
-| Window was difficult to move and re-centered | Search covered most of the drag region; every show repositioned it | Visible six-dot drag handle and one-time centering per process |
+| Window was difficult to move and re-centered | Search covered most of the drag region; every show repositioned it | Full-width titlebar drag strip above Search and one-time centering per process |
+| Lists would not scroll | Results depended on a calculated height inside a non-grid content area | Bounded Grid rows, `min-height: 0`, and independent vertical overflow for results and Settings |
+| Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
 
 ## 1. Quick diagnosis
 
@@ -569,7 +571,27 @@ Do not attempt to fix this by changing random Linux key codes. The Ctrl and V co
 
 **Cause:** Earlier builds left only a very narrow draggable area around the search field and recalculated the centered position every time the picker opened.
 
-**Solution:** Current builds include a six-dot drag handle to the left of Search. Hold and drag that handle. LClip centers itself only for its first opening in a process and preserves the user-selected position afterward.
+**Solution:** Current builds reserve a clear strip across the top of the content pane. Hold and drag that strip; Search sits directly below it and the close button remains at the top-right. LClip centers itself only for its first opening in a process and preserves the user-selected position afterward.
+
+On native Wayland, the compositor controls global window positioning. Electron can request an initial position only where the compositor permits it, but a user-initiated drag through the titlebar region should remain the supported movement path. If dragging still fails, confirm the installed build contains the current `titlebar-drag` markup and restart the resident LClip process after reinstalling.
+
+### History, emoji, kaomoji, GIFs, symbols, or Settings will not scroll
+
+**Cause:** Earlier builds calculated the results height from a block container. At some window sizes, the content-based minimum height won and the inner overflow area never became a usable scroll container.
+
+**Solution:** Update and reinstall LClip. Current builds use a bounded CSS Grid row and independent `overflow-y: auto` regions. Test with the mouse pointer over the results area, not over the mode rail or category row. A touchpad two-finger gesture, mouse wheel, dragging the scrollbar, and arrow-key selection should all navigate long results.
+
+### The picker closes after choosing one item
+
+**Cause:** An older build hid the window to return focus to the previous application but did not restore it afterward.
+
+**Solution:** Update and restart LClip. Current builds briefly hide for automatic paste, then restore the picker at the same position. You can choose several records or characters in sequence. Click the top-right close button, press `Esc`, or click outside LClip when finished.
+
+### The wallpaper is too visible through the window
+
+**Cause:** Compositor blur differs between GNOME, KDE, X11, Wayland, GPU drivers, and desktop effects. The older material also used a more transparent base.
+
+**Solution:** Current builds use a substantially more opaque dark base and stronger blur. If transparency remains distracting, enable the desktop's increased-contrast or reduced-transparency option where available; LClip's high-contrast media query switches the material to an opaque near-black surface.
 
 ### Automatic paste suddenly stopped after installing a bridge
 

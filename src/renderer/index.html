@@ -27,13 +27,17 @@
 
     <main class="picker">
       <header class="window-header">
-        <div class="drag-handle" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="search-wrap">
-          <span aria-hidden="true">⌕</span>
-          <input id="searchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search clipboard history" aria-label="Search LClip">
-          <kbd>Super&nbsp;+&nbsp;.</kbd>
+        <div class="titlebar-drag" aria-label="Drag LClip window">
+          <span class="drag-indicator" aria-hidden="true"></span>
+          <button class="window-close" id="closeButton" aria-label="Close LClip">×</button>
         </div>
-        <button class="window-close" id="closeButton" aria-label="Close LClip">×</button>
+        <div class="search-row">
+          <div class="search-wrap">
+            <span aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search clipboard history" aria-label="Search LClip">
+            <kbd>Super&nbsp;+&nbsp;.</kbd>
+          </div>
+        </div>
       </header>
 
       <section class="content-area" aria-labelledby="sectionTitle">

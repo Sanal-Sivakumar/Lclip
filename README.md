@@ -16,7 +16,7 @@
 
 ---
 
-LClip stays ready after graphical login. Press `Super + .` from any application to open a polished, dark glass picker containing the last 10 copied text items, emoji, kaomoji, GIFs, and useful symbols.
+LClip stays ready after graphical login. Press `Super + .` from any application to open a compact, dark layered-glass picker containing the last 10 copied text items, more than 200 offline emoji, kaomoji, GIFs, and useful symbols.
 
 > [!IMPORTANT]
 > LClip never replaces normal `Ctrl+C` or `Ctrl+V`. It registers only `Super + .`; it is not a keylogger and does not receive unrelated keystrokes.
@@ -45,13 +45,13 @@ LClip stays ready after graphical login. Press `Super + .` from any application 
 | | Capability | What it gives you |
 | --- | --- | --- |
 | **▣** | **Clipboard history** | The latest 10 non-empty copied text items, deduplicated and stored locally |
-| **☺** | **Emoji picker** | Searchable emoji that work in any text-capable application |
-| **ツ** | **Kaomoji** | Expressive text faces that need no special image support |
+| **☺** | **Emoji picker** | More than 200 searchable, categorized Unicode emoji with Noto Color Emoji preferred on Linux |
+| **ツ** | **Kaomoji** | More than 60 categorized text faces that need no special image support |
 | **GIF** | **GIPHY search** | Optional reaction search with a user-supplied API key |
-| **Ω** | **Special characters** | Arrows, currency, mathematics, punctuation, and technical symbols |
+| **Ω** | **Special characters** | More than 100 arrows, currencies, mathematics, punctuation, Greek, marks, and technical symbols |
 | **⌨** | **Keyboard-first control** | Search, arrow navigation, `Enter` to paste, and `Esc` to close |
 | **◉** | **Desktop integration** | Login autostart, tray controls, global shortcut, and automatic-paste bridge |
-| **◇** | **Glass interface** | Compact, dark, translucent UI designed to stay out of the workflow |
+| **◇** | **Layered glass interface** | Compact, dark, readable material with a dedicated drag strip and independently scrolling content |
 
 LClip can pause capture, clear history, and report shortcut or paste limitations honestly instead of silently claiming success.
 
@@ -81,8 +81,16 @@ When an item is selected, LClip:
 2. Hides its picker window.
 3. Waits briefly so the previous application can regain focus.
 4. Uses the best available input bridge to send the normal `Ctrl+V` paste action.
+5. Restores the picker in the same position so another history item, emoji, kaomoji, GIF, or symbol can be chosen.
 
-LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux blocks automatic input or no bridge is installed, the item is still copied safely and LClip displays a notification asking the user to press `Ctrl+V` manually.
+LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux blocks automatic input or no bridge is installed, the item is still copied safely and LClip displays a notification asking the user to press `Ctrl+V` manually. The picker remains available for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
+
+### Window, scrolling, and character browsing
+
+- Drag anywhere in the clear strip above Search. The close button stays at the top-right and remains clickable.
+- Scroll inside the results region with a mouse wheel, touchpad, scrollbar, or keyboard navigation. History, emoji, kaomoji, GIF, symbols, and Settings each keep their own bounded scroll area.
+- Emoji categories follow common Unicode/CLDR grouping and render with the installed platform font, preferring `Noto Color Emoji` on Linux. LClip does not download emoji while you type.
+- The interaction model takes cues from the familiar Windows emoji panel—one search field, clear content modes, categories, arrow navigation, and Enter to insert—without copying Windows artwork or changing LClip's Linux-native identity.
 
 ## Linux support
 
@@ -338,9 +346,9 @@ LClip is an Electron application split into security boundaries:
 - `src/main/store.mjs` validates, limits, deduplicates, and persists local state.
 - `src/main/paste-bridge.mjs` detects and invokes a supported Linux input tool.
 - `src/preload/preload.cjs` exposes a small, named API to the UI through Electron's context bridge.
-- `src/renderer/` contains the HTML, CSS, and browser-side interaction code.
+- `src/renderer/` contains the HTML, layered-material CSS, browser-side interaction code, and offline character catalog.
 - `scripts/` contains the Linux system installer and uninstaller.
-- `tests/` verifies history rules and paste-bridge selection.
+- `tests/` verifies history rules, paste-bridge selection, and minimum offline catalog coverage.
 
 See [technical_details.md](technical_details.md) for a beginner-friendly explanation of Electron, GNOME, KDE, X11, Wayland, portals, IPC, autostart, packaging, and every major runtime flow.
 
