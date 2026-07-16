@@ -18,6 +18,7 @@ This document records the important development problems addressed in LClip and 
 | Lists would not scroll | Results depended on a calculated height inside a non-grid content area | Bounded Grid rows, `min-height: 0`, and independent vertical overflow for results and Settings |
 | Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
 | Project license was permissive MIT despite a permanent open-source goal | MIT permits proprietary redistribution | Replaced with full GNU GPLv3 text and consistent `GPL-3.0-only` project metadata |
+| New installation still displayed the removed footer and immovable window | `/opt/lclip` was replaced while the old Electron process continued running code already loaded in memory | Installer now stops the resident instance, clears stale build output, installs atomically, records the Git revision, and starts the new process |
 
 ## 1. Quick diagnosis
 
@@ -595,9 +596,27 @@ Pure native Wayland is still available by setting `LCLIP_NATIVE_WAYLAND=1`, but 
 
 ### The removed footer still appears
 
-**Cause:** The resident LClip process or `/opt/lclip` installation is older than the current checkout.
+**Cause:** The resident LClip process or `/opt/lclip` installation is older than the current checkout. Replacing files under `/opt/lclip` does not change JavaScript already loaded in a running Electron process.
 
-**Solution:** Use the stop-and-reinstall commands above. The current picker has no bottom capture/navigation/paste-status footer; those diagnostics are available only in Settings.
+**Solution:** Pull the current commit and run the current installer. It now stops the old process, removes stale `dist/`, installs a fresh bundle, and starts the new resident process automatically:
+
+```bash
+cd ~/Documents/Lclip
+git pull --ff-only origin main
+./scripts/install-system.sh --configure-ydotool
+```
+
+The current picker has no bottom capture/navigation/paste-status footer; those diagnostics are available only in Settings. The installer prints a 12-character build revision. Open Settings and confirm its `Build:` value matches.
+
+For an independent check:
+
+```bash
+cat /opt/lclip/resources/LCLIP_BUILD
+git rev-parse --short=12 HEAD
+pgrep -a lclip
+```
+
+The two revisions must match. If they do but the old footer is visible, capture those outputs and the Settings integration text before making further changes.
 
 ### History, emoji, kaomoji, GIFs, symbols, or Settings will not scroll
 

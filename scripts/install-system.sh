@@ -51,6 +51,7 @@ echo "Building LClip…"
 cd "$PROJECT_DIR"
 if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
 npm run verify
+rm -rf "$PROJECT_DIR/dist"
 npm run pack:linux
 
 case "$(uname -m)" in
@@ -65,6 +66,19 @@ else
 fi
 [[ -n "$BUNDLE" ]] || { echo "The packaged Linux application was not found." >&2; exit 1; }
 
+stop_running_lclip() {
+  echo "Stopping the currently running LClip instance…"
+  pkill -TERM -x lclip 2>/dev/null || true
+  pkill -TERM -f '^/opt/lclip/lclip( |$)' 2>/dev/null || true
+  for _ in {1..30}; do
+    if ! pgrep -f '^/opt/lclip/lclip( |$)' >/dev/null 2>&1; then return; fi
+    sleep 0.1
+  done
+  pkill -KILL -f '^/opt/lclip/lclip( |$)' 2>/dev/null || true
+}
+
+stop_running_lclip
+
 echo "Installing LClip in /opt/lclip…"
 "${SUDO[@]}" rm -rf /opt/lclip.new
 "${SUDO[@]}" install -d -m 0755 /opt/lclip.new /usr/local/bin /usr/share/applications /usr/share/icons/hicolor/scalable/apps /etc/xdg/autostart
@@ -75,6 +89,13 @@ echo "Installing LClip in /opt/lclip…"
 if [[ -f /opt/lclip/chrome-sandbox ]]; then
   "${SUDO[@]}" chmod 4755 /opt/lclip/chrome-sandbox
 fi
+
+SOURCE_REVISION="$(git -C "$PROJECT_DIR" rev-parse --short=12 HEAD 2>/dev/null || true)"
+if [[ -z "$SOURCE_REVISION" ]]; then SOURCE_REVISION="v$(node -p 'require("./package.json").version')"; fi
+BUILD_MARKER="$(mktemp)"
+printf '%s\n' "$SOURCE_REVISION" >"$BUILD_MARKER"
+"${SUDO[@]}" install -m 0644 "$BUILD_MARKER" /opt/lclip/resources/LCLIP_BUILD
+rm -f "$BUILD_MARKER"
 
 LAUNCHER="$(mktemp)"
 DESKTOP="$(mktemp)"
@@ -219,8 +240,14 @@ echo "LClip is installed."
 echo "  Application: /opt/lclip"
 echo "  Command:     /usr/local/bin/lclip"
 echo "  Shortcut:    Super + ."
+echo "  Build:       $SOURCE_REVISION"
 echo
-echo "Start it now with: lclip --show"
+if [[ "${EUID}" -ne 0 && ( -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ) ]]; then
+  nohup /usr/local/bin/lclip --hidden >"${TMPDIR:-/tmp}/lclip-startup.log" 2>&1 &
+  echo "The new resident LClip process has been started. Press Super + . to open it."
+else
+  echo "Start it now with: lclip --show"
+fi
 echo "LClip will start automatically after the next graphical login."
 if [[ "$NEEDS_RELOGIN" -eq 1 ]]; then
   echo

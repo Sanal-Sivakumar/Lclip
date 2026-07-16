@@ -92,6 +92,7 @@ LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux block
 - Emoji categories follow common Unicode/CLDR grouping and render with the installed platform font, preferring `Noto Color Emoji` on Linux. LClip does not download emoji while you type.
 - The interaction model takes cues from the familiar Windows emoji panel—one search field, clear content modes, categories, arrow navigation, and Enter to insert—without copying Windows artwork or changing LClip's Linux-native identity.
 - The persistent footer has been removed. Capture, shortcut, paste-bridge, and window-backend diagnostics remain available in Settings when they are needed.
+- Settings also shows the installed Git revision, making it easy to distinguish a current build from an older resident process.
 
 ## Linux support
 
@@ -169,16 +170,17 @@ The installer performs the complete setup:
 1. Confirms that it is running on Linux.
 2. Installs the exact JavaScript dependencies from `package-lock.json`.
 3. Runs syntax checks and all automated tests.
-4. Detects whether the laptop uses x86-64 or ARM64.
-5. Builds the matching Electron application bundle.
-6. Installs the application under `/opt/lclip`.
-7. Creates the `lclip` terminal command and application-menu entry.
-8. Adds graphical-login autostart for supported desktop environments.
-9. Configures the native `Super + .` custom shortcut when installing from a GNOME session.
-10. Attempts to install automatic-paste tools using `apt`, `dnf`, `pacman`, or `zypper`.
-11. With `--configure-ydotool`, installs both the `ydotool` client and separately packaged `ydotoold` daemon when required by the distribution.
-12. Creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
-13. Installs and enables `~/.config/systemd/user/lclip-ydotoold.service` when the distribution does not provide a usable user service.
+4. Deletes stale `dist/` output and builds a fresh Electron application bundle.
+5. Stops any resident older LClip process before replacing the installation.
+6. Detects whether the laptop uses x86-64 or ARM64 and installs the matching bundle atomically under `/opt/lclip`.
+7. Records the installed Git revision and starts the new resident process in the current graphical session.
+8. Creates the `lclip` terminal command and application-menu entry.
+9. Adds graphical-login autostart for supported desktop environments.
+10. Configures the native `Super + .` custom shortcut when installing from a GNOME session.
+11. Attempts to install automatic-paste tools using `apt`, `dnf`, `pacman`, or `zypper`.
+12. With `--configure-ydotool`, installs both the `ydotool` client and separately packaged `ydotoold` daemon when required by the distribution.
+13. Creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
+14. Installs and enables `~/.config/systemd/user/lclip-ydotoold.service` when the distribution does not provide a usable user service.
 
 > [!IMPORTANT]
 > After using `--configure-ydotool`, **log out of Linux completely and log back in**. Opening a new terminal is not enough. Linux applies the new `lclip-uinput` group membership only to a new login session.

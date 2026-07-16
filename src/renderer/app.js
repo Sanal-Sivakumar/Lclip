@@ -10,7 +10,7 @@ const demoState = {
     { id: "demo-3", text: "https://github.com/", createdAt: Date.now() - 3_600_000 }
   ],
   settings: { captureEnabled: true, autostartEnabled: true, giphyApiKey: "", gifRating: "pg" },
-  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, windowBackend: "Browser preview", session: "preview", desktop: "" }
+  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, windowBackend: "Browser preview", buildRevision: "development checkout", session: "preview", desktop: "" }
 };
 
 const demoApi = {
@@ -268,7 +268,7 @@ function openSettings() {
   $("#giphyKey").value = state.data.settings.giphyApiKey || "";
   $("#gifRating").value = state.data.settings.gifRating || "pg";
   const shortcut = state.data.status.shortcut ? "Shortcut registered" : "Shortcut unavailable";
-  $("#integrationCard").textContent = `${shortcut} · ${state.data.status.pasteBridge}. Window: ${state.data.status.windowBackend || "Native desktop"}. Session: ${state.data.status.session}${state.data.status.desktop ? ` · ${state.data.status.desktop}` : ""}.`;
+  $("#integrationCard").textContent = `${shortcut} · ${state.data.status.pasteBridge}. Window: ${state.data.status.windowBackend || "Native desktop"}. Build: ${state.data.status.buildRevision || "unknown"}. Session: ${state.data.status.session}${state.data.status.desktop ? ` · ${state.data.status.desktop}` : ""}.`;
   const sheet = $("#settingsSheet");
   sheet.hidden = false;
   sheet.setAttribute("aria-hidden", "false");

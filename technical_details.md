@@ -222,6 +222,10 @@ The tray is a small status icon provided by the desktop panel. GNOME may require
 
 The first process start is a **cold start** because Electron and the renderer must load. Later `lclip --show` commands encounter the single-instance lock and forward the request to the resident process, producing a much faster **warm opening**.
 
+### Installed build identity
+
+The system installer records the checkout's 12-character Git revision in `/opt/lclip/resources/LCLIP_BUILD`. The main process reads this marker at startup and exposes it only to the Settings integration card. If Git metadata is unavailable, the package version is used instead. This makes a stale resident process visible: after reinstalling, Settings must show the same revision printed by the installer.
+
 ### Capture flow
 
 1. Electron reads text from the standard clipboard.
@@ -394,6 +398,8 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 - `--help`: prints the supported choices without changing the system.
 
 The installer rejects conflicting or unknown options. It must be invoked as the desktop user so `sudo` is used only for system file operations and the GNOME shortcut is written into the correct user's settings.
+
+Before packaging, the installer removes `dist/` so an old unpacked bundle cannot be selected accidentally. After verification and packaging, it terminates the currently resident `/opt/lclip/lclip` process, replaces `/opt/lclip` atomically, writes the build marker, and starts the newly installed process in the current graphical session. This restart is essential because replacing executable files on disk does not rewrite code already loaded into a running Electron process.
 
 ## 10. Tests and verification
 

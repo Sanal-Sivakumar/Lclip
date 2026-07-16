@@ -1,4 +1,5 @@
 import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } from "electron";
+import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addHistoryItem, StateStore } from "./store.mjs";
@@ -36,6 +37,13 @@ let dragSafetyTimer;
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
+const buildRevision = (() => {
+  try {
+    return readFileSync(join(process.resourcesPath, "LCLIP_BUILD"), "utf8").trim().slice(0, 80) || `v${app.getVersion()}`;
+  } catch {
+    return app.isPackaged ? `v${app.getVersion()}` : "development checkout";
+  }
+})();
 
 function publicState() {
   const snapshot = store.snapshot();
@@ -48,6 +56,7 @@ function publicState() {
       pasteBridge: bridge.label,
       automaticPaste: bridge.automatic,
       windowBackend: windowBackend.label,
+      buildRevision,
       session: process.env.XDG_SESSION_TYPE || (process.platform === "linux" ? "unknown" : process.platform),
       desktop: process.env.XDG_CURRENT_DESKTOP || ""
     }
