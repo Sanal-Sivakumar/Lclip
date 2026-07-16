@@ -99,9 +99,8 @@ button { color: inherit; }
   position: relative;
   min-width: 0;
   user-select: none;
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
-  touch-action: none;
+  app-region: drag;
+  -webkit-app-region: drag;
   cursor: grab;
 }
 .titlebar-drag:active { cursor: grabbing; }

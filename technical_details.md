@@ -45,7 +45,7 @@ This protection is why automatic paste can behave differently across Linux deskt
 
 ### Xwayland
 
-**Xwayland** runs X11 applications inside a Wayland session. LClip now uses this compatibility backend for its own picker window when both `WAYLAND_DISPLAY` and `DISPLAY` indicate that a Wayland session and Xwayland are available. Electron documents that native Wayland generally prevents applications from querying or programmatically changing their global window position; an Xwayland window permits LClip's explicit drag implementation to move reliably. This window-rendering choice is separate from automatic paste: `ydotool` can still target native Wayland applications through `uinput`, while `xdotool` normally reaches only X11/Xwayland targets.
+**Xwayland** runs X11 applications inside a Wayland session. LClip now uses this compatibility backend for its own picker window when both `WAYLAND_DISPLAY` and `DISPLAY` indicate that a Wayland session and Xwayland are available. Electron documents that native Wayland generally prevents applications from querying or programmatically changing their global window position; an Xwayland window lets the desktop window manager honor Electron's native draggable region. This window-rendering choice is separate from automatic paste: `ydotool` can still target native Wayland applications through `uinput`, while `xdotool` normally reaches only X11/Xwayland targets.
 
 ### Session
 
@@ -97,7 +97,7 @@ Linux can also have a primary selection, commonly pasted with the middle mouse b
 
 ### Focus
 
-The focused application receives keyboard input. When LClip opens, it temporarily becomes focused. Before automatic paste, it hides and waits 150 milliseconds so the previous application can become active again. This short delay reduces the chance that the generated paste is delivered to LClip itself. After the paste bridge finishes, LClip leaves an additional 80-millisecond settling interval before restoring the picker for another selection. A normal focus loss caused by clicking outside still dismisses it.
+The focused application receives keyboard input. When LClip opens, it temporarily becomes focused. Before automatic paste on X11/Xwayland, it remains visible but calls `blur()` and waits 150 milliseconds so the previous application can become active again. This short delay reduces the chance that the generated paste is delivered to LClip itself. After the paste bridge finishes, LClip leaves an additional 80-millisecond settling interval before refocusing the same picker for another selection. A normal focus loss caused by clicking outside still dismisses it.
 
 ## 3. Why LClip starts after login
 
@@ -187,9 +187,15 @@ This is safer than exposing all of Electron. The renderer can request an approve
 
 The picker is a 700x510 Electron `BrowserWindow` configured as frameless, transparent, always on top, absent from the taskbar, visible on every workspace, and hidden when it loses focus. The visual “glass” comes from a mostly opaque tinted base, one translucent highlight layer, and compositor blur. The higher base opacity prevents detailed wallpaper from competing with text while still retaining environmental color. Actual appearance can differ with compositor support, GPU drivers, and accessibility settings.
 
-The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 28-pixel strip above Search captures a primary-pointer press and sends `lclip:drag-start` through the preload bridge. The main process samples the global cursor and calls `setPosition` approximately every 16 milliseconds until `lclip:drag-stop`, pointer cancellation, focus loss, or a 10-second safety timeout. The close button is excluded from drag initiation. After movement, later openings preserve the user-selected position instead of forcing the picker back to the center.
+The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 28-pixel strip above Search uses Electron's native `app-region: drag` contract, allowing the desktop window manager to perform the move. The close button uses `app-region: no-drag`, so it remains interactive. This avoids fragile renderer pointer capture, cursor polling, and repeated JavaScript `setPosition` calls. After movement, later openings preserve the user-selected position instead of forcing the picker back to the center.
 
 On Wayland sessions, the backend selector chooses `--ozone-platform=x11` only when Xwayland's `DISPLAY` is available. `LCLIP_NATIVE_WAYLAND=1` or an explicitly supplied `--ozone-platform` switch disables that automatic choice. Native Wayland remains available for systems without Xwayland, but Electron's window-position restriction means drag cannot be guaranteed there.
+
+### Focus and repeated activation
+
+Selecting a result does not hide, destroy, or recreate the picker. On X11 and Xwayland, the main process sets an `activationInProgress` guard, calls `BrowserWindow.blur()` so the previous application can receive input, invokes the configured paste bridge, and then calls `focus()` on the same visible `BrowserWindow`. Because `showWindow()` and the `lclip:open` reset event are not used during this flow, the current mode, query, scroll position, and selection remain intact. The blur-to-hide listener ignores the deliberate intermediate blur while the guard is active; a later real click outside still hides the picker normally.
+
+Electron does not provide equivalent programmatic focus control for a pure native Wayland window. In that backend LClip keeps the picker visible, copies the selected value, skips synthetic paste to avoid typing into its own Search field, and reports the manual-paste fallback. The default Wayland installation uses Xwayland when available specifically so draggable positioning and focus handoff work consistently.
 
 ### Scroll containment
 
@@ -243,10 +249,10 @@ The system installer records the checkout's 12-character Git revision in `/opt/l
 2. The main process validates and limits the string.
 3. It writes the value to the system clipboard.
 4. The value is also moved to the front of history.
-5. The window hides and waits 150 milliseconds.
+5. The visible window yields focus and waits 150 milliseconds.
 6. The paste bridge sends `Ctrl+V`; if it fails, the next detected bridge is attempted.
-7. After an 80-millisecond focus-settling interval, LClip restores the picker at its preserved position for another selection.
-8. If every bridge fails, LClip leaves the value copied, displays a notification, and shows “Copied · press Ctrl+V to paste” as a temporary in-window toast.
+7. After an 80-millisecond focus-settling interval, LClip refocuses the same still-visible picker for another selection.
+8. If every bridge fails, LClip leaves the value copied, displays a notification, and shows a manual-paste instruction as a temporary in-window toast.
 
 ### GIF flow
 

@@ -32,8 +32,6 @@ let rendererReady = false;
 let pendingShow = false;
 let hasPositionedWindow = false;
 let activationInProgress = false;
-let dragTimer;
-let dragSafetyTimer;
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
@@ -113,31 +111,8 @@ function createWindow() {
     }
   });
   window.on("blur", () => {
-    stopWindowDrag();
     if (window?.isVisible() && !activationInProgress && !window.webContents.isDevToolsOpened()) window.hide();
   });
-}
-
-function stopWindowDrag() {
-  clearInterval(dragTimer);
-  clearTimeout(dragSafetyTimer);
-  dragTimer = undefined;
-  dragSafetyTimer = undefined;
-}
-
-function startWindowDrag() {
-  if (!window || window.isDestroyed()) return;
-  stopWindowDrag();
-  const cursorOrigin = screen.getCursorScreenPoint();
-  const [windowX, windowY] = window.getPosition();
-  dragTimer = setInterval(() => {
-    if (!window || window.isDestroyed()) return stopWindowDrag();
-    const cursor = screen.getCursorScreenPoint();
-    window.setPosition(windowX + cursor.x - cursorOrigin.x, windowY + cursor.y - cursorOrigin.y);
-  }, 16);
-  dragTimer.unref?.();
-  dragSafetyTimer = setTimeout(stopWindowDrag, 10_000);
-  dragSafetyTimer.unref?.();
 }
 
 function positionWindow() {
@@ -196,16 +171,23 @@ function startClipboardMonitor() {
 }
 
 async function pasteIntoPreviousApp(waitMilliseconds) {
-  const reopenPicker = Boolean(window?.isVisible());
+  const pickerWasVisible = Boolean(window?.isVisible());
+  const nativeWayland = process.platform === "linux"
+    && String(process.env.XDG_SESSION_TYPE || "").toLowerCase() === "wayland"
+    && !windowBackend.useXwayland;
   activationInProgress = true;
-  window?.hide();
   try {
+    // X11 and Xwayland can yield focus without hiding the picker. Native
+    // Wayland does not expose that window-control capability to Electron, so
+    // avoid injecting input into LClip's own search field on that backend.
+    if (nativeWayland) return false;
+    if (pickerWasVisible) window.blur();
     await delay(waitMilliseconds);
     return await pasteWithBridge(bridge);
   } finally {
     await delay(80);
     activationInProgress = false;
-    if (reopenPicker) showWindow();
+    if (pickerWasVisible && window && !window.isDestroyed() && window.isVisible()) window.focus();
   }
 }
 
@@ -217,7 +199,7 @@ async function activateText(text) {
   store.update(state => { state.history = addHistoryItem(state.history, value); });
   const pasted = await pasteIntoPreviousApp(150);
   if (!pasted && Notification.isSupported()) {
-    new Notification({ title: "LClip copied the item", body: "Automatic paste is unavailable. Press Ctrl+V to paste it." }).show();
+    new Notification({ title: "LClip copied the item", body: "Automatic paste is unavailable. Focus the target app, then press Ctrl+V." }).show();
   }
   broadcast();
   return { ok: true, pasted };
@@ -361,8 +343,6 @@ function registerIpc() {
     return publicState();
   });
   ipcMain.handle("lclip:search-gifs", (_event, query) => searchGiphy(query));
-  ipcMain.on("lclip:drag-start", startWindowDrag);
-  ipcMain.on("lclip:drag-stop", stopWindowDrag);
   ipcMain.on("lclip:hide", () => window?.hide());
 }
 
@@ -388,7 +368,6 @@ app.whenReady().then(async () => {
 app.on("activate", showWindow);
 app.on("before-quit", () => {
   isQuitting = true;
-  stopWindowDrag();
   clearInterval(monitor);
   globalShortcut.unregisterAll();
 });

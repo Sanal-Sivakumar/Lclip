@@ -78,16 +78,16 @@ On GNOME, the installer also creates a native desktop custom shortcut for the sa
 When an item is selected, LClip:
 
 1. Writes the selected value to the normal system clipboard.
-2. Hides its picker window.
-3. Waits briefly so the previous application can regain focus.
+2. Keeps the picker visible and temporarily yields keyboard focus to the previous application.
+3. Waits briefly for the desktop to complete that focus change.
 4. Uses the best available input bridge to send the normal `Ctrl+V` paste action.
-5. Restores the picker in the same position so another history item, emoji, kaomoji, GIF, or symbol can be chosen.
+5. Returns focus to the same still-open picker without resetting its mode, search, scroll position, or selection.
 
-LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux blocks automatic input or no bridge is installed, the item is still copied safely and LClip displays a notification asking the user to press `Ctrl+V` manually. The picker remains available for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
+LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux blocks automatic input, no bridge is installed, or the picker is running as a pure native Wayland window, the item is still copied safely and LClip asks the user to focus the target application and press `Ctrl+V` manually. The picker remains available for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
 
 ### Window, scrolling, and character browsing
 
-- Drag anywhere in the clear strip above Search. LClip moves the window through its desktop process instead of depending only on CSS drag regions; the close button stays at the top-right and remains clickable.
+- Drag anywhere in the clear strip above Search. It is an Electron native draggable region, while the close button is explicitly excluded so it remains clickable.
 - Scroll inside the results region with a mouse wheel, touchpad, scrollbar, or keyboard navigation. History, emoji, kaomoji, GIF, symbols, and Settings each keep their own bounded scroll area.
 - Emoji categories follow common Unicode/CLDR grouping and render with the installed platform font, preferring `Noto Color Emoji` on Linux. LClip does not download emoji while you type.
 - The interaction model takes cues from the familiar Windows emoji panel—one search field, clear content modes, categories, arrow navigation, and Enter to insert—without copying Windows artwork or changing LClip's Linux-native identity.
@@ -259,7 +259,7 @@ LClip attempts the installed bridges in this order:
 2. `wtype`, when the Wayland compositor supports its virtual-keyboard protocol;
 3. `xdotool`, for X11 or compatible Xwayland targets.
 
-If one bridge fails, LClip tries the next. If all fail, the selected item remains on the clipboard, the picker hides to restore focus, and LClip reports **“Copied · press Ctrl+V to paste.”** This is a safe fallback rather than data loss.
+If one bridge fails, LClip tries the next. If all fail, the selected item remains on the clipboard, the picker remains visible, and LClip asks you to focus the target application and press `Ctrl+V`. This is a safe fallback rather than data loss.
 
 Ubuntu 24.04 currently supplies `ydotool 0.1.8`, which uses symbolic shortcuts such as `ydotool key ctrl+v`. Modern ydotool 1.x uses explicit Linux key-code press/release events. LClip detects the installed syntax: it sends symbolic `ctrl+v` to 0.x and numeric key events to 1.x. This prevents old versions from typing digits instead of pasting.
 

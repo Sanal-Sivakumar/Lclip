@@ -11,10 +11,10 @@ This document records the important development problems addressed in LClip and 
 | Electron aborted on `chrome-sandbox` | Helper ownership/mode was unsafe after copying | Installer applies `root:root` ownership and mode `4755` |
 | `Super + .` did not open the picker | Electron/Wayland portal registration was unavailable or conflicted | GNOME-native custom shortcut plus Electron registration of the same chord |
 | First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
-| Picker disappeared after one selection | Earlier activation hid the picker permanently after yielding focus for paste | Paste now yields focus briefly and restores the picker for repeated selections |
+| Picker disappeared after one selection | Earlier activation hid and reopened the picker to yield focus for paste | Paste now yields focus without hiding the visible picker |
 | “Automatic paste is unavailable” | Bridge executable existed but its service/protocol/device permission failed | Ordered bridge fallback and optional restricted `ydotool` `/dev/uinput` configuration |
 | Selecting history typed digits such as `2442` | Ubuntu ydotool 0.1.8 received the incompatible ydotool 1.x numeric event syntax | Runtime version detection selects symbolic `ctrl+v` for 0.x and numeric events for 1.x |
-| Window remained immovable even with a visible drag strip | Native Wayland blocks Electron's global position APIs, and the CSS region alone did not move the surface | Xwayland window backend on Wayland plus explicit main-process cursor tracking and one-time centering |
+| Window remained immovable even with a visible drag strip | The strip was incorrectly marked `no-drag`, while its JavaScript cursor-tracking fallback was unreliable | Electron's native draggable-region contract on X11/Xwayland, with the close button excluded |
 | Lists would not scroll | Results depended on a calculated height inside a non-grid content area | Bounded Grid rows, `min-height: 0`, and independent vertical overflow for results and Settings |
 | Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
 | Project license was permissive MIT despite a permanent open-source goal | MIT permits proprietary redistribution | Replaced with full GNU GPLv3 text and consistent `GPL-3.0-only` project metadata |
@@ -494,7 +494,7 @@ Expected signals:
 - a `ydotool` or `ydotoold` user service is active, when supplied by the distribution.
 - otherwise, the installer-created `lclip-ydotoold.service` is active.
 
-The picker intentionally hides before attempting paste so focus can return to the previous application. After a failed attempt, the status changes to “Copied · press Ctrl+V to paste” and a desktop notification is shown. The LClip process remains running and can be reopened with `Super + .` or `lclip --show`.
+The picker now remains visible while attempting paste. On X11/Xwayland it briefly yields keyboard focus, pastes into the previous application, and refocuses the same window without resetting it. After a failed attempt, the selected value remains on the clipboard and a desktop notification asks you to focus the target application and paste manually.
 
 ### `ydotool` is installed but paste fails
 
@@ -571,9 +571,9 @@ Do not attempt to fix this by changing random Linux key codes. The Ctrl and V co
 
 ### The picker cannot be moved or returns to the center
 
-**Cause:** Earlier builds first left only a narrow draggable area, then added a visible CSS drag strip. On this GNOME Wayland system the strip rendered correctly, but native Wayland still prevented Electron from changing the window's global position.
+**Cause:** Earlier builds first left only a narrow draggable area, then rendered a visible strip marked `app-region: no-drag` and tried to simulate movement by polling the global cursor. That fallback was sensitive to pointer events and desktop window-position restrictions.
 
-**Solution:** Current builds reserve a clear strip across the top of the content pane and implement dragging through the main process. In a Wayland session with Xwayland available, LClip automatically starts its own window with `--ozone-platform=x11`, tracks the cursor while the strip is held, and updates the window position. Search remains below the strip and the close button remains at the top-right.
+**Solution:** Current builds reserve a clear strip across the top of the content pane and mark it with Electron's native `app-region: drag`. The desktop window manager owns the drag operation; there is no renderer pointer-capture or cursor-polling loop. On a Wayland session with Xwayland available, LClip automatically starts its own window with `--ozone-platform=x11`. Search remains below the strip and the top-right close button is marked `no-drag`.
 
 After updating, completely stop the resident process before reinstalling and testing; otherwise the old single instance remains active:
 
@@ -593,6 +593,14 @@ printf 'Session=%s WAYLAND_DISPLAY=%s DISPLAY=%s NATIVE=%s\n' \
 ```
 
 Pure native Wayland is still available by setting `LCLIP_NATIVE_WAYLAND=1`, but window movement cannot be guaranteed because Electron documents that native Wayland generally forbids programmatic global positioning.
+
+### Selecting an item makes the picker disappear and reappear
+
+**Cause:** Earlier builds implemented automatic paste by hiding the picker, waiting for the previous application to regain focus, sending `Ctrl+V`, and calling `showWindow()` again. That created a visible close/reopen cycle and reset transient interface state.
+
+**Solution:** Current builds keep the same window visible. On X11/Xwayland, LClip deliberately blurs it while an activation guard suppresses the normal outside-click dismissal, performs the paste, and then refocuses that same window. The picker should retain its mode, search query, scroll position, and selection. It hides only after a normal click outside, the close button, or `Esc`.
+
+If the picker still visibly restarts, verify the installed build in Settings and fully reinstall; an old resident Electron process continues running old JavaScript even after files on disk are replaced.
 
 ### The removed footer still appears
 
@@ -628,7 +636,7 @@ The two revisions must match. If they do but the old footer is visible, capture 
 
 **Cause:** An older build hid the window to return focus to the previous application but did not restore it afterward.
 
-**Solution:** Update and restart LClip. Current builds briefly hide for automatic paste, then restore the picker at the same position. You can choose several records or characters in sequence. Click the top-right close button, press `Esc`, or click outside LClip when finished.
+**Solution:** Update and restart LClip. Current builds keep the picker visible, briefly yield focus for automatic paste, and then refocus the same window without resetting it. You can choose several records or characters in sequence. Click the top-right close button, press `Esc`, or click outside LClip when finished.
 
 ### The wallpaper is too visible through the window
 

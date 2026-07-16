@@ -31,7 +31,7 @@ Use one mostly opaque translucent window material, a fine internal highlight, an
 ## Components
 
 - Global search field with shortcut hint and immediate filtering
-- Full-width titlebar drag strip backed by explicit desktop-process movement, with an excluded top-right close control
+- Full-width titlebar using Electron's native draggable-region contract, with an excluded top-right close control
 - Vertical mode rail for Clipboard, Emoji, Kaomoji, GIFs, and Symbols
 - Clipboard rows with preview, source time, copy number, and destructive removal action
 - Character grids with large glyph, searchable name, and category filter

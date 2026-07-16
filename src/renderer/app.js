@@ -22,8 +22,6 @@ const demoApi = {
   saveSettings: async settings => { demoState.settings = { ...demoState.settings, ...settings }; return structuredClone(demoState); },
   searchGifs: async () => ({ state: "missing-key", results: [] }),
   activateGif: async () => ({ ok: true, pasted: false }),
-  beginWindowDrag: () => {},
-  endWindowDrag: () => {},
   hide: () => {},
   onState: () => () => {},
   onOpen: () => () => {},
@@ -229,13 +227,13 @@ function selectIndex(index, scroll = true) {
 
 async function activateValue(value) {
   const result = await api.activate(value);
-  if (!result?.pasted) toast(api.platform === "browser" ? "Copied in preview mode" : "Copied · press Ctrl+V to paste");
+  if (!result?.pasted) toast(api.platform === "browser" ? "Copied in preview mode" : "Copied · focus the target, then press Ctrl+V");
 }
 
 async function activateGif(gif) {
   try {
     const result = await api.activateGif(gif);
-    if (!result?.pasted) toast(api.platform === "browser" ? "GIF selected in preview mode" : "GIF copied · press Ctrl+V to paste");
+    if (!result?.pasted) toast(api.platform === "browser" ? "GIF selected in preview mode" : "GIF copied · focus the target, then press Ctrl+V");
   } catch (error) {
     toast(error.message || "Could not paste that GIF");
   }
@@ -328,24 +326,6 @@ $("#settingsClose").onclick = closeSettings;
 $("#sheetScrim").onclick = closeSettings;
 $("#saveSettingsButton").onclick = saveSettings;
 $("#clearHistoryButton").onclick = clearHistory;
-
-const dragSurface = $(".titlebar-drag");
-let activeDragPointer;
-dragSurface.addEventListener("pointerdown", event => {
-  if (event.button !== 0 || event.target.closest("button")) return;
-  activeDragPointer = event.pointerId;
-  dragSurface.setPointerCapture?.(event.pointerId);
-  api.beginWindowDrag();
-});
-const endWindowDrag = event => {
-  if (activeDragPointer === undefined || (event?.pointerId !== undefined && event.pointerId !== activeDragPointer)) return;
-  if (dragSurface.hasPointerCapture?.(activeDragPointer)) dragSurface.releasePointerCapture(activeDragPointer);
-  activeDragPointer = undefined;
-  api.endWindowDrag();
-};
-dragSurface.addEventListener("pointerup", endWindowDrag);
-dragSurface.addEventListener("pointercancel", endWindowDrag);
-window.addEventListener("blur", () => endWindowDrag());
 
 document.addEventListener("keydown", event => {
   const settingsOpen = $("#settingsSheet").classList.contains("open");
