@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("lclip", {
   saveSettings: settings => ipcRenderer.invoke("lclip:save-settings", settings),
   searchGifs: query => ipcRenderer.invoke("lclip:search-gifs", query),
   activateGif: gif => ipcRenderer.invoke("lclip:activate-gif", gif),
+  beginWindowDrag: () => ipcRenderer.send("lclip:drag-start"),
+  endWindowDrag: () => ipcRenderer.send("lclip:drag-stop"),
   hide: () => ipcRenderer.send("lclip:hide"),
   onState: callback => listen("lclip:state", callback),
   onOpen: callback => listen("lclip:open", callback),

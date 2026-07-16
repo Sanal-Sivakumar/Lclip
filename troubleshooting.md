@@ -14,7 +14,7 @@ This document records the important development problems addressed in LClip and 
 | Picker disappeared after one selection | Earlier activation hid the picker permanently after yielding focus for paste | Paste now yields focus briefly and restores the picker for repeated selections |
 | “Automatic paste is unavailable” | Bridge executable existed but its service/protocol/device permission failed | Ordered bridge fallback and optional restricted `ydotool` `/dev/uinput` configuration |
 | Selecting history typed digits such as `2442` | Ubuntu ydotool 0.1.8 received the incompatible ydotool 1.x numeric event syntax | Runtime version detection selects symbolic `ctrl+v` for 0.x and numeric events for 1.x |
-| Window was difficult to move and re-centered | Search covered most of the drag region; every show repositioned it | Full-width titlebar drag strip above Search and one-time centering per process |
+| Window remained immovable even with a visible drag strip | Native Wayland blocks Electron's global position APIs, and the CSS region alone did not move the surface | Xwayland window backend on Wayland plus explicit main-process cursor tracking and one-time centering |
 | Lists would not scroll | Results depended on a calculated height inside a non-grid content area | Bounded Grid rows, `min-height: 0`, and independent vertical overflow for results and Settings |
 | Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
 
@@ -569,11 +569,34 @@ Do not attempt to fix this by changing random Linux key codes. The Ctrl and V co
 
 ### The picker cannot be moved or returns to the center
 
-**Cause:** Earlier builds left only a very narrow draggable area around the search field and recalculated the centered position every time the picker opened.
+**Cause:** Earlier builds first left only a narrow draggable area, then added a visible CSS drag strip. On this GNOME Wayland system the strip rendered correctly, but native Wayland still prevented Electron from changing the window's global position.
 
-**Solution:** Current builds reserve a clear strip across the top of the content pane. Hold and drag that strip; Search sits directly below it and the close button remains at the top-right. LClip centers itself only for its first opening in a process and preserves the user-selected position afterward.
+**Solution:** Current builds reserve a clear strip across the top of the content pane and implement dragging through the main process. In a Wayland session with Xwayland available, LClip automatically starts its own window with `--ozone-platform=x11`, tracks the cursor while the strip is held, and updates the window position. Search remains below the strip and the close button remains at the top-right.
 
-On native Wayland, the compositor controls global window positioning. Electron can request an initial position only where the compositor permits it, but a user-initiated drag through the titlebar region should remain the supported movement path. If dragging still fails, confirm the installed build contains the current `titlebar-drag` markup and restart the resident LClip process after reinstalling.
+After updating, completely stop the resident process before reinstalling and testing; otherwise the old single instance remains active:
+
+```bash
+cd ~/Documents/Lclip
+git pull --ff-only origin main
+pkill -x lclip 2>/dev/null || true
+./scripts/install-system.sh --configure-ydotool
+/usr/local/bin/lclip --show
+```
+
+Open Settings and confirm that the integration card says `Window: Xwayland compatibility`. If it says `Native desktop` on a Wayland session, check that `DISPLAY` is non-empty and `LCLIP_NATIVE_WAYLAND` is not set:
+
+```bash
+printf 'Session=%s WAYLAND_DISPLAY=%s DISPLAY=%s NATIVE=%s\n' \
+  "$XDG_SESSION_TYPE" "$WAYLAND_DISPLAY" "$DISPLAY" "$LCLIP_NATIVE_WAYLAND"
+```
+
+Pure native Wayland is still available by setting `LCLIP_NATIVE_WAYLAND=1`, but window movement cannot be guaranteed because Electron documents that native Wayland generally forbids programmatic global positioning.
+
+### The removed footer still appears
+
+**Cause:** The resident LClip process or `/opt/lclip` installation is older than the current checkout.
+
+**Solution:** Use the stop-and-reinstall commands above. The current picker has no bottom capture/navigation/paste-status footer; those diagnostics are available only in Settings.
 
 ### History, emoji, kaomoji, GIFs, symbols, or Settings will not scroll
 

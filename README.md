@@ -6,7 +6,7 @@
   <p>
     <a href="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml"><img src="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml/badge.svg" alt="Verify LClip status"></a>
     <img src="https://img.shields.io/badge/Linux-GNOME%20%7C%20KDE-85bed8?style=flat-square&logo=linux&logoColor=white" alt="Linux GNOME and KDE">
-    <img src="https://img.shields.io/badge/Wayland-first-28404c?style=flat-square" alt="Wayland first">
+    <img src="https://img.shields.io/badge/Wayland%20%2B%20X11-28404c?style=flat-square" alt="Wayland and X11">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-c1e8f8?style=flat-square" alt="MIT License"></a>
   </p>
   <p>
@@ -87,14 +87,15 @@ LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux block
 
 ### Window, scrolling, and character browsing
 
-- Drag anywhere in the clear strip above Search. The close button stays at the top-right and remains clickable.
+- Drag anywhere in the clear strip above Search. LClip moves the window through its desktop process instead of depending only on CSS drag regions; the close button stays at the top-right and remains clickable.
 - Scroll inside the results region with a mouse wheel, touchpad, scrollbar, or keyboard navigation. History, emoji, kaomoji, GIF, symbols, and Settings each keep their own bounded scroll area.
 - Emoji categories follow common Unicode/CLDR grouping and render with the installed platform font, preferring `Noto Color Emoji` on Linux. LClip does not download emoji while you type.
 - The interaction model takes cues from the familiar Windows emoji panel—one search field, clear content modes, categories, arrow navigation, and Enter to insert—without copying Windows artwork or changing LClip's Linux-native identity.
+- The persistent footer has been removed. Capture, shortcut, paste-bridge, and window-backend diagnostics remain available in Settings when they are needed.
 
 ## Linux support
 
-LClip is designed for GNOME and KDE Plasma on Wayland, with an X11 fallback. It also installs an XDG autostart entry for several related desktop environments. Exact global-shortcut and automatic-paste behavior depends on the distribution, desktop, compositor, portal version, and security settings.
+LClip is designed for GNOME and KDE Plasma in Wayland or X11 sessions. On a Wayland session with Xwayland available, LClip uses an Xwayland-backed picker window by default because Electron cannot reliably inspect or programmatically move a native Wayland window. Clipboard capture, GNOME's native `Super + .` binding, and `ydotool` automatic paste still operate in the surrounding Wayland session. Set `LCLIP_NATIVE_WAYLAND=1` only to opt back into native Wayland rendering and accept that manual window movement may be unavailable.
 
 This repository is developed and packaged from macOS as well as Linux, but the operating-system integration must be verified on a real Linux graphical session. A successful build on macOS does not prove that a particular GNOME or KDE configuration will permit synthetic paste.
 
@@ -345,6 +346,7 @@ LClip is an Electron application split into security boundaries:
 - `src/main/main.mjs` owns the desktop window, clipboard monitor, global shortcut, tray, state, GIPHY requests, and system integration.
 - `src/main/store.mjs` validates, limits, deduplicates, and persists local state.
 - `src/main/paste-bridge.mjs` detects and invokes a supported Linux input tool.
+- `src/main/window-backend.mjs` selects native or Xwayland-compatible rendering for reliable window movement.
 - `src/preload/preload.cjs` exposes a small, named API to the UI through Electron's context bridge.
 - `src/renderer/` contains the HTML, layered-material CSS, browser-side interaction code, and offline character catalog.
 - `scripts/` contains the Linux system installer and uninstaller.

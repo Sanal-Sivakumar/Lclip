@@ -27,6 +27,7 @@ No dashboard shell, oversized marketing UI, neon gamer styling, decorative glass
 - Keep clipboard history local, bounded to 10 text entries, and easy to clear or pause.
 - Support repeated selections without forcing the user to reopen the picker after every item.
 - Make keyboard navigation and pointer interaction equally complete.
+- Keep routine chrome minimal; diagnostics belong in Settings rather than a persistent footer.
 - Treat GNOME, KDE, X11, and Wayland capability differences honestly and degrade gracefully.
 
 ## Accessibility & Inclusion

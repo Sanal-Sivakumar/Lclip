@@ -3,9 +3,16 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addHistoryItem, StateStore } from "./store.mjs";
 import { detectPasteBridge, pasteWithBridge } from "./paste-bridge.mjs";
+import { selectWindowBackend } from "./window-backend.mjs";
 
 app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal,GlobalShortcutsPortalPreferredTrigger");
-app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+const windowBackend = selectWindowBackend({
+  platform: process.platform,
+  env: process.env,
+  ozonePlatformAlreadySet: app.commandLine.hasSwitch("ozone-platform")
+});
+if (windowBackend.useXwayland) app.commandLine.appendSwitch("ozone-platform", "x11");
+else app.commandLine.appendSwitch("ozone-platform-hint", "auto");
 app.setName("LClip");
 if (process.platform === "linux") app.setDesktopName("io.lclip.LClip.desktop");
 
@@ -23,8 +30,9 @@ let isQuitting = false;
 let rendererReady = false;
 let pendingShow = false;
 let hasPositionedWindow = false;
-let lastPasteOutcome = "";
 let activationInProgress = false;
+let dragTimer;
+let dragSafetyTimer;
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
@@ -39,7 +47,7 @@ function publicState() {
       shortcutLabel: "Super + .",
       pasteBridge: bridge.label,
       automaticPaste: bridge.automatic,
-      lastPasteOutcome,
+      windowBackend: windowBackend.label,
       session: process.env.XDG_SESSION_TYPE || (process.platform === "linux" ? "unknown" : process.platform),
       desktop: process.env.XDG_CURRENT_DESKTOP || ""
     }
@@ -96,8 +104,31 @@ function createWindow() {
     }
   });
   window.on("blur", () => {
+    stopWindowDrag();
     if (window?.isVisible() && !activationInProgress && !window.webContents.isDevToolsOpened()) window.hide();
   });
+}
+
+function stopWindowDrag() {
+  clearInterval(dragTimer);
+  clearTimeout(dragSafetyTimer);
+  dragTimer = undefined;
+  dragSafetyTimer = undefined;
+}
+
+function startWindowDrag() {
+  if (!window || window.isDestroyed()) return;
+  stopWindowDrag();
+  const cursorOrigin = screen.getCursorScreenPoint();
+  const [windowX, windowY] = window.getPosition();
+  dragTimer = setInterval(() => {
+    if (!window || window.isDestroyed()) return stopWindowDrag();
+    const cursor = screen.getCursorScreenPoint();
+    window.setPosition(windowX + cursor.x - cursorOrigin.x, windowY + cursor.y - cursorOrigin.y);
+  }, 16);
+  dragTimer.unref?.();
+  dragSafetyTimer = setTimeout(stopWindowDrag, 10_000);
+  dragSafetyTimer.unref?.();
 }
 
 function positionWindow() {
@@ -176,7 +207,6 @@ async function activateText(text) {
   lastClipboard = value;
   store.update(state => { state.history = addHistoryItem(state.history, value); });
   const pasted = await pasteIntoPreviousApp(150);
-  lastPasteOutcome = pasted ? "Pasted into the previous application" : "Copied · press Ctrl+V to paste";
   if (!pasted && Notification.isSupported()) {
     new Notification({ title: "LClip copied the item", body: "Automatic paste is unavailable. Press Ctrl+V to paste it." }).show();
   }
@@ -211,7 +241,6 @@ async function activateGif(gif) {
     });
     lastClipboard = url;
     const pasted = await pasteIntoPreviousApp(180);
-    lastPasteOutcome = pasted ? "GIF pasted into the previous application" : "GIF copied · press Ctrl+V to paste";
     broadcast();
     return { ok: true, pasted };
   } finally {
@@ -323,6 +352,8 @@ function registerIpc() {
     return publicState();
   });
   ipcMain.handle("lclip:search-gifs", (_event, query) => searchGiphy(query));
+  ipcMain.on("lclip:drag-start", startWindowDrag);
+  ipcMain.on("lclip:drag-stop", stopWindowDrag);
   ipcMain.on("lclip:hide", () => window?.hide());
 }
 
@@ -348,6 +379,7 @@ app.whenReady().then(async () => {
 app.on("activate", showWindow);
 app.on("before-quit", () => {
   isQuitting = true;
+  stopWindowDrag();
   clearInterval(monitor);
   globalShortcut.unregisterAll();
 });

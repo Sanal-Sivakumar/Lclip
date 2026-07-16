@@ -22,7 +22,7 @@ Use the Linux system UI stack: `system-ui`, Ubuntu, Cantarell, Noto Sans, and sa
 
 ## Shape and Layout
 
-The picker is a compact 700x510 floating utility with 11–16px structural radii and full-pill treatment only for tiny status indicators. A narrow tab rail anchors the left edge. A 28px clear drag strip sits above Search; bounded, independently scrolling results occupy the remaining surface. Content remains dense, scannable, and free of nested cards.
+The picker is a compact 700x510 floating utility with 11–16px structural radii and a full-pill treatment only for the small drag indicator. A narrow tab rail anchors the left edge. A 28px clear drag strip sits above Search; bounded, independently scrolling results occupy the remaining surface. There is no persistent footer, leaving more room for results and removing information that is unnecessary during routine use.
 
 ## Materials
 
@@ -31,13 +31,12 @@ Use one mostly opaque translucent window material, a fine internal highlight, an
 ## Components
 
 - Global search field with shortcut hint and immediate filtering
-- Full-width titlebar drag strip with an excluded top-right close control
+- Full-width titlebar drag strip backed by explicit desktop-process movement, with an excluded top-right close control
 - Vertical mode rail for Clipboard, Emoji, Kaomoji, GIFs, and Symbols
 - Clipboard rows with preview, source time, copy number, and destructive removal action
 - Character grids with large glyph, searchable name, and category filter
 - Independent vertical scroll regions for every long mode and Settings
 - GIF masonry with explicit GIPHY attribution, loading, offline, and missing-key states
-- Footer status showing capture state, item count, navigation keys, and paste capability
 - Inline settings sheet for launch-at-login, history pause, shortcut status, and GIPHY key
 
 ## Motion

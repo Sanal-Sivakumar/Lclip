@@ -10,7 +10,7 @@ const demoState = {
     { id: "demo-3", text: "https://github.com/", createdAt: Date.now() - 3_600_000 }
   ],
   settings: { captureEnabled: true, autostartEnabled: true, giphyApiKey: "", gifRating: "pg" },
-  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, lastPasteOutcome: "", session: "preview", desktop: "" }
+  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, windowBackend: "Browser preview", session: "preview", desktop: "" }
 };
 
 const demoApi = {
@@ -22,6 +22,8 @@ const demoApi = {
   saveSettings: async settings => { demoState.settings = { ...demoState.settings, ...settings }; return structuredClone(demoState); },
   searchGifs: async () => ({ state: "missing-key", results: [] }),
   activateGif: async () => ({ ok: true, pasted: false }),
+  beginWindowDrag: () => {},
+  endWindowDrag: () => {},
   hide: () => {},
   onState: () => () => {},
   onOpen: () => () => {},
@@ -94,7 +96,6 @@ function render() {
   else if (state.mode === "kaomoji") renderGlyphs(kaomoji, true);
   else if (state.mode === "symbols") renderGlyphs(symbols, false);
   else renderGifs();
-  renderStatus();
   selectIndex(Math.min(state.selectedIndex, Math.max(0, selectables().length - 1)), false);
 }
 
@@ -213,13 +214,6 @@ function renderEmpty(container, title, description, icon, actionLabel, action) {
   container.append(empty);
 }
 
-function renderStatus() {
-  const enabled = state.data.settings.captureEnabled;
-  $("#captureStatus").classList.toggle("paused", !enabled);
-  $("#captureStatus span").textContent = enabled ? `Capture on · ${state.data.history.length}/10 items` : "Clipboard capture is paused";
-  $("#pasteStatus").textContent = state.data.status.lastPasteOutcome || state.data.status.pasteBridge;
-}
-
 function selectables() { return $$('[data-selectable="true"]'); }
 function selectIndex(index, scroll = true) {
   const nodes = selectables();
@@ -274,7 +268,7 @@ function openSettings() {
   $("#giphyKey").value = state.data.settings.giphyApiKey || "";
   $("#gifRating").value = state.data.settings.gifRating || "pg";
   const shortcut = state.data.status.shortcut ? "Shortcut registered" : "Shortcut unavailable";
-  $("#integrationCard").textContent = `${shortcut} · ${state.data.status.pasteBridge}. Session: ${state.data.status.session}${state.data.status.desktop ? ` · ${state.data.status.desktop}` : ""}.`;
+  $("#integrationCard").textContent = `${shortcut} · ${state.data.status.pasteBridge}. Window: ${state.data.status.windowBackend || "Native desktop"}. Session: ${state.data.status.session}${state.data.status.desktop ? ` · ${state.data.status.desktop}` : ""}.`;
   const sheet = $("#settingsSheet");
   sheet.hidden = false;
   sheet.setAttribute("aria-hidden", "false");
@@ -334,7 +328,24 @@ $("#settingsClose").onclick = closeSettings;
 $("#sheetScrim").onclick = closeSettings;
 $("#saveSettingsButton").onclick = saveSettings;
 $("#clearHistoryButton").onclick = clearHistory;
-$("#captureSetting").onchange = event => { $("#captureStatus").classList.toggle("paused", !event.target.checked); };
+
+const dragSurface = $(".titlebar-drag");
+let activeDragPointer;
+dragSurface.addEventListener("pointerdown", event => {
+  if (event.button !== 0 || event.target.closest("button")) return;
+  activeDragPointer = event.pointerId;
+  dragSurface.setPointerCapture?.(event.pointerId);
+  api.beginWindowDrag();
+});
+const endWindowDrag = event => {
+  if (activeDragPointer === undefined || (event?.pointerId !== undefined && event.pointerId !== activeDragPointer)) return;
+  if (dragSurface.hasPointerCapture?.(activeDragPointer)) dragSurface.releasePointerCapture(activeDragPointer);
+  activeDragPointer = undefined;
+  api.endWindowDrag();
+};
+dragSurface.addEventListener("pointerup", endWindowDrag);
+dragSurface.addEventListener("pointercancel", endWindowDrag);
+window.addEventListener("blur", () => endWindowDrag());
 
 document.addEventListener("keydown", event => {
   const settingsOpen = $("#settingsSheet").classList.contains("open");

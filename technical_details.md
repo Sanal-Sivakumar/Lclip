@@ -45,7 +45,7 @@ This protection is why automatic paste can behave differently across Linux deskt
 
 ### Xwayland
 
-**Xwayland** runs older X11 applications inside a Wayland session. An X11 automation tool may work with an Xwayland target but fail with a native Wayland application. Therefore `xdotool` on a Wayland session is reported as “Automatic paste · Xwayland”, not as universal Wayland support.
+**Xwayland** runs X11 applications inside a Wayland session. LClip now uses this compatibility backend for its own picker window when both `WAYLAND_DISPLAY` and `DISPLAY` indicate that a Wayland session and Xwayland are available. Electron documents that native Wayland generally prevents applications from querying or programmatically changing their global window position; an Xwayland window permits LClip's explicit drag implementation to move reliably. This window-rendering choice is separate from automatic paste: `ydotool` can still target native Wayland applications through `uinput`, while `xdotool` normally reaches only X11/Xwayland targets.
 
 ### Session
 
@@ -154,6 +154,7 @@ This separation prevents UI code from receiving unrestricted filesystem or proce
 
 `src/main/main.mjs` is the entry point. It:
 
+- selects native desktop or Xwayland-compatible window rendering before Electron starts;
 - enables relevant Wayland and portal features;
 - enforces a single running LClip instance;
 - creates the transparent picker window;
@@ -186,7 +187,9 @@ This is safer than exposing all of Electron. The renderer can request an approve
 
 The picker is a 700x510 Electron `BrowserWindow` configured as frameless, transparent, always on top, absent from the taskbar, visible on every workspace, and hidden when it loses focus. The visual “glass” comes from a mostly opaque tinted base, one translucent highlight layer, and compositor blur. The higher base opacity prevents detailed wallpaper from competing with text while still retaining environmental color. Actual appearance can differ with compositor support, GPU drivers, and accessibility settings.
 
-The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 28-pixel strip above Search uses the standard `app-region: drag` behavior plus Electron's `-webkit-app-region: drag` compatibility form. The close button and Search are explicitly `no-drag`, so they still receive clicks. After the user drags the window, later openings preserve that position instead of forcing it back to the center.
+The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 28-pixel strip above Search captures a primary-pointer press and sends `lclip:drag-start` through the preload bridge. The main process samples the global cursor and calls `setPosition` approximately every 16 milliseconds until `lclip:drag-stop`, pointer cancellation, focus loss, or a 10-second safety timeout. The close button is excluded from drag initiation. After movement, later openings preserve the user-selected position instead of forcing the picker back to the center.
+
+On Wayland sessions, the backend selector chooses `--ozone-platform=x11` only when Xwayland's `DISPLAY` is available. `LCLIP_NATIVE_WAYLAND=1` or an explicitly supplied `--ozone-platform` switch disables that automatic choice. Native Wayland remains available for systems without Xwayland, but Electron's window-position restriction means drag cannot be guaranteed there.
 
 ### Scroll containment
 
@@ -239,7 +242,7 @@ The first process start is a **cold start** because Electron and the renderer mu
 5. The window hides and waits 150 milliseconds.
 6. The paste bridge sends `Ctrl+V`; if it fails, the next detected bridge is attempted.
 7. After an 80-millisecond focus-settling interval, LClip restores the picker at its preserved position for another selection.
-8. If every bridge fails, LClip leaves the value copied, displays a notification, and records “Copied · press Ctrl+V to paste” for the status bar.
+8. If every bridge fails, LClip leaves the value copied, displays a notification, and shows “Copied · press Ctrl+V to paste” as a temporary in-window toast.
 
 ### GIF flow
 
@@ -302,7 +305,7 @@ LClip searches each directory in `PATH` and builds an ordered candidate list:
 3. `xdotool` as the X11 or Xwayland fallback;
 4. copy-only mode if none is available.
 
-During activation, LClip attempts each candidate until one exits successfully. This matters when `ydotool` is installed but `ydotoold` is not ready, or when `wtype` is installed but unsupported by the current compositor. The status bar and Settings show the preferred detected result, while the latest activation outcome reports whether paste actually succeeded.
+During activation, LClip attempts each candidate until one exits successfully. This matters when `ydotool` is installed but `ydotoold` is not ready, or when `wtype` is installed but unsupported by the current compositor. Settings shows the preferred detected bridge and active window backend; a failure also produces a desktop notification and temporary toast.
 
 ## 7. State and persistence
 
@@ -405,8 +408,9 @@ The installer rejects conflicting or unknown options. It must be invoked as the 
 - paste falls back to the next candidate when the preferred bridge exits with an error.
 - ydotool 0.x uses symbolic `ctrl+v` rather than the incompatible 1.x numeric event sequence.
 - the offline emoji, kaomoji, and symbol catalogs meet their minimum sizes, contain searchable metadata, and do not duplicate values.
+- Wayland sessions choose Xwayland only when it is available and the user has not requested native Wayland.
 
-The current suite contains ten tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
+The current suite contains eleven tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
 
 ## 11. Known boundaries
 
