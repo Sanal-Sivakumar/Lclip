@@ -7,7 +7,7 @@
     <a href="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml"><img src="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml/badge.svg" alt="Verify LClip status"></a>
     <img src="https://img.shields.io/badge/Linux-GNOME%20%7C%20KDE-85bed8?style=flat-square&logo=linux&logoColor=white" alt="Linux GNOME and KDE">
     <img src="https://img.shields.io/badge/Wayland%20%2B%20X11-28404c?style=flat-square" alt="Wayland and X11">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-c1e8f8?style=flat-square" alt="MIT License"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-c1e8f8?style=flat-square" alt="GNU GPL version 3 license"></a>
   </p>
   <p>
     <code>Super</code> + <code>.</code>
@@ -401,4 +401,8 @@ The uninstaller removes the application, launcher, menu entry, icon, system auto
 
 ## License
 
-LClip is available under the [MIT License](LICENSE).
+LClip is free software licensed under the **[GNU General Public License version 3.0 only](LICENSE)** (`GPL-3.0-only`). You may use, study, modify, and redistribute it. If you distribute a modified version or another covered work based on LClip, the GPL requires that recipients receive the corresponding source code and the same GPLv3 freedoms.
+
+This is LClip's copyleft commitment: distributed versions cannot be converted into closed-source proprietary editions. The GPL does not require someone to publish modifications that remain entirely private and are never distributed.
+
+Linux packages include a copy of `LICENSE` in the application's resources so recipients receive the license with the program.

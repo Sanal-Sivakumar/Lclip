@@ -17,6 +17,7 @@ This document records the important development problems addressed in LClip and 
 | Window remained immovable even with a visible drag strip | Native Wayland blocks Electron's global position APIs, and the CSS region alone did not move the surface | Xwayland window backend on Wayland plus explicit main-process cursor tracking and one-time centering |
 | Lists would not scroll | Results depended on a calculated height inside a non-grid content area | Bounded Grid rows, `min-height: 0`, and independent vertical overflow for results and Settings |
 | Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
+| Project license was permissive MIT despite a permanent open-source goal | MIT permits proprietary redistribution | Replaced with full GNU GPLv3 text and consistent `GPL-3.0-only` project metadata |
 
 ## 1. Quick diagnosis
 
@@ -698,6 +699,22 @@ lclip --show
 **Cause:** Browser preview uses a demonstration API and cannot reproduce Electron global shortcuts, native clipboard ownership, tray behavior, autostart, or Linux input bridges.
 
 **Solution:** Use preview only for visual work. Run Electron for desktop behavior and a real Linux session for OS integration.
+
+### GitHub still displays MIT or does not detect GPLv3
+
+**Cause:** The license change has not been committed and pushed, GitHub has not refreshed its repository metadata, or `LICENSE`, `package.json`, and the root `package-lock.json` entry disagree.
+
+**Checks:**
+
+```bash
+head -3 LICENSE
+node -p "require('./package.json').license"
+sed -n '1,16p' package-lock.json
+```
+
+The outputs should identify GNU GPL version 3 and `GPL-3.0-only`. Commit and push the changed files, then allow GitHub a short time to re-detect the license.
+
+Do not replace every `MIT` occurrence inside `package-lock.json`. Those remaining values belong to third-party dependencies and must continue to report their own licenses accurately.
 
 ## 11. Safe reset and clean reinstall
 

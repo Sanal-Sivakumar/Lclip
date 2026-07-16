@@ -6,7 +6,7 @@
   "type": "module",
   "private": true,
   "author": "LClip",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -31,6 +31,9 @@
       "src/**/*",
       "assets/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      "LICENSE"
     ],
     "linux": {
       "target": ["AppImage", "deb", "rpm"],

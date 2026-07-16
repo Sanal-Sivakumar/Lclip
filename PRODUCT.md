@@ -29,6 +29,7 @@ No dashboard shell, oversized marketing UI, neon gamer styling, decorative glass
 - Make keyboard navigation and pointer interaction equally complete.
 - Keep routine chrome minimal; diagnostics belong in Settings rather than a persistent footer.
 - Treat GNOME, KDE, X11, and Wayland capability differences honestly and degrade gracefully.
+- Keep every distributed LClip version free and open source through GPLv3 copyleft.
 
 ## Accessibility & Inclusion
 

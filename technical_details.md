@@ -412,7 +412,17 @@ The installer rejects conflicting or unknown options. It must be invoked as the 
 
 The current suite contains eleven tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
 
-## 11. Known boundaries
+## 11. License and copyleft
+
+LClip's project code is licensed as `GPL-3.0-only`, the modern SPDX identifier for the GNU General Public License version 3 only. The repository includes the complete official GPLv3 text in `LICENSE`; `package.json` and the root entry in `package-lock.json` use the same identifier. Electron Builder's `extraResources` configuration also copies `LICENSE` into packaged applications so binary recipients receive it with the program.
+
+GPLv3 is a **copyleft** free-software license. Users may run, inspect, study, modify, and redistribute LClip. When somebody distributes a modified covered version, they must preserve the license notices, provide the corresponding source under GPLv3, and give recipients the same freedoms. Merely making a private modification does not trigger a requirement to publish it. GPLv3 also differs from the GNU Affero GPL: operating a modified program only as a network service is not, by itself, GPLv3 distribution.
+
+The license fields recorded under individual `node_modules` entries in `package-lock.json` describe third-party dependencies and remain under their respective MIT, BSD, Apache, ISC, or other licenses. Changing those entries would misrepresent their authors' licensing and is not part of relicensing LClip.
+
+Authoritative references: [GNU GPL licenses](https://www.gnu.org/licenses/) and the [SPDX license list](https://spdx.org/licenses/).
+
+## 12. Known boundaries
 
 - Text history only; copied images and files are not retained as history entries.
 - A maximum of 10 entries is intentional.
