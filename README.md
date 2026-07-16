@@ -83,7 +83,7 @@ When an item is selected, LClip:
 4. Uses the best available input bridge to send the normal `Ctrl+V` paste action.
 5. Returns focus to the same still-open picker without resetting its mode, search, scroll position, or selection.
 
-LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. If Linux blocks automatic input, no bridge is installed, or the picker is running as a pure native Wayland window, the item is still copied safely and LClip asks the user to focus the target application and press `Ctrl+V` manually. The picker remains available for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
+LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. Before invoking a bridge, it verifies that the visible picker successfully yielded focus so generated input cannot be pasted into LClip itself. If Linux blocks the focus change or automatic input, or no bridge is installed, the item is still copied safely and LClip asks the user to focus the target application and press `Ctrl+V` manually. The picker remains available for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
 
 ### Window, scrolling, and character browsing
 

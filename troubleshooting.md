@@ -602,6 +602,12 @@ Pure native Wayland is still available by setting `LCLIP_NATIVE_WAYLAND=1`, but 
 
 If the picker still visibly restarts, verify the installed build in Settings and fully reinstall; an old resident Electron process continues running old JavaScript even after files on disk are replaced.
 
+### Paste stopped with “Automatic paste is unavailable” after the keep-open update
+
+**Cause:** The first keep-open implementation rejected every native-Wayland activation before calling the already-working paste bridge. Backend selection could also mistake Electron's own ozone setting for an explicit native-Wayland request, leaving both focus handoff and movement unavailable.
+
+**Solution:** Current builds force the picker through Xwayland whenever a Wayland session exposes `DISPLAY`; only `LCLIP_NATIVE_WAYLAND=1` opts out. The installed launcher passes `--ozone-platform=x11` before Electron initializes, while the application repeats the selection as a safeguard. The picker now temporarily becomes non-focusable, yields focus without hiding, verifies that the handoff succeeded, pastes, and restores focusability. Reinstall the application so both the launcher and resident process receive the correction.
+
 ### The removed footer still appears
 
 **Cause:** The resident LClip process or `/opt/lclip` installation is older than the current checkout. Replacing files under `/opt/lclip` does not change JavaScript already loaded in a running Electron process.

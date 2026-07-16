@@ -104,6 +104,9 @@ trap 'rm -f "$LAUNCHER" "$DESKTOP" "$AUTOSTART"' EXIT
 
 cat >"$LAUNCHER" <<'EOF'
 #!/bin/sh
+if [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then
+  exec /opt/lclip/lclip --ozone-platform=x11 "$@"
+fi
 exec /opt/lclip/lclip "$@"
 EOF
 

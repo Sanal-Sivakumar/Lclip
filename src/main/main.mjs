@@ -9,8 +9,7 @@ import { selectWindowBackend } from "./window-backend.mjs";
 app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal,GlobalShortcutsPortalPreferredTrigger");
 const windowBackend = selectWindowBackend({
   platform: process.platform,
-  env: process.env,
-  ozonePlatformAlreadySet: app.commandLine.hasSwitch("ozone-platform")
+  env: process.env
 });
 if (windowBackend.useXwayland) app.commandLine.appendSwitch("ozone-platform", "x11");
 else app.commandLine.appendSwitch("ozone-platform-hint", "auto");
@@ -75,6 +74,7 @@ function createWindow() {
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
+    movable: true,
     resizable: true,
     maximizable: false,
     fullscreenable: false,
@@ -172,22 +172,32 @@ function startClipboardMonitor() {
 
 async function pasteIntoPreviousApp(waitMilliseconds) {
   const pickerWasVisible = Boolean(window?.isVisible());
-  const nativeWayland = process.platform === "linux"
-    && String(process.env.XDG_SESSION_TYPE || "").toLowerCase() === "wayland"
-    && !windowBackend.useXwayland;
+  let focusabilityChanged = false;
   activationInProgress = true;
   try {
-    // X11 and Xwayland can yield focus without hiding the picker. Native
-    // Wayland does not expose that window-control capability to Electron, so
-    // avoid injecting input into LClip's own search field on that backend.
-    if (nativeWayland) return false;
-    if (pickerWasVisible) window.blur();
+    if (pickerWasVisible && window && !window.isDestroyed()) {
+      try {
+        window.setFocusable(false);
+        focusabilityChanged = true;
+      } catch {
+        // Some window managers only support blur; the focus check below still
+        // prevents accidental paste into LClip itself.
+      }
+      window.blur();
+    }
     await delay(waitMilliseconds);
+    if (pickerWasVisible && window && !window.isDestroyed() && window.isFocused()) return false;
     return await pasteWithBridge(bridge);
   } finally {
     await delay(80);
+    if (focusabilityChanged && window && !window.isDestroyed()) {
+      try { window.setFocusable(true); } catch {}
+    }
     activationInProgress = false;
-    if (pickerWasVisible && window && !window.isDestroyed() && window.isVisible()) window.focus();
+    if (pickerWasVisible && window && !window.isDestroyed() && window.isVisible()) {
+      window.focus();
+      window.webContents.focus();
+    }
   }
 }
 

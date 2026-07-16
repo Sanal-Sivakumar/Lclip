@@ -10,6 +10,17 @@ test("Wayland sessions prefer the movable Xwayland window backend when available
 
   assert.equal(selectWindowBackend({
     platform: "linux",
+    env: {
+      XDG_SESSION_TYPE: "wayland",
+      WAYLAND_DISPLAY: "wayland-0",
+      DISPLAY: ":0",
+      ELECTRON_OZONE_PLATFORM_HINT: "auto"
+    },
+    ozonePlatformAlreadySet: true
+  }).useXwayland, true);
+
+  assert.equal(selectWindowBackend({
+    platform: "linux",
     env: { XDG_SESSION_TYPE: "wayland", WAYLAND_DISPLAY: "wayland-0", DISPLAY: ":0", LCLIP_NATIVE_WAYLAND: "1" }
   }).useXwayland, false);
 
