@@ -75,6 +75,17 @@ On GNOME, the installer also creates a native desktop custom shortcut for the sa
 
 Every fresh `Super + .` opening starts on **Clipboard history**, clears the previous search/category selection, closes Settings if necessary, and scrolls History to the top. The automatic reopen that follows a paste is part of the current interaction and does not perform this reset.
 
+Shortcut support follows the desktop environment rather than the distribution name:
+
+| Linux desktop/session | Shortcut integration |
+|---|---|
+| GNOME on Ubuntu, Fedora, Debian, Arch, openSUSE, or another distribution | Installer creates the native GNOME custom shortcut through `gsettings`; Electron registration remains as a second path |
+| KDE Plasma on Kubuntu, Fedora KDE, KDE neon, openSUSE, Arch, or another distribution | Electron requests `Super + .` through the Wayland Global Shortcuts portal; KDE may show a one-time approval |
+| X11 desktops including XFCE, Cinnamon, MATE, LXQt, GNOME Xorg, and Plasma X11 | Electron normally registers `Super + .` directly with X11 |
+| Other Wayland compositors | Works when their XDG Desktop Portal supports global shortcuts; otherwise add `/usr/local/bin/lclip --show` manually in the desktop's keyboard-shortcut settings |
+
+The installer and autostart files support common Debian/Ubuntu, Fedora/RHEL, Arch, and openSUSE families. A desktop-specific shortcut conflict can still require manual removal of the existing binding.
+
 ### Selecting and pasting an item
 
 When an item is selected, LClip:
@@ -183,6 +194,10 @@ The installer performs the complete setup:
 12. With `--configure-ydotool`, installs both the `ydotool` client and separately packaged `ydotoold` daemon when required by the distribution.
 13. Creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
 14. Installs and enables `~/.config/systemd/user/lclip-ydotoold.service` when the distribution does not provide a usable user service.
+
+### Connect and contribute
+
+Settings includes direct links to the [LClip GitHub repository](https://github.com/Sanal-Sivakumar/Lclip) for source code, issues, and contributions, and to [sanalsiva2005@gmail.com](mailto:sanalsiva2005@gmail.com) for contacting the developer. LClip opens only these approved destinations in the system browser or mail application; webpage content is never embedded inside the picker.
 
 > [!IMPORTANT]
 > After using `--configure-ydotool`, **log out of Linux completely and log back in**. Opening a new terminal is not enough. Linux applies the new `lclip-uinput` group membership only to a new login session.

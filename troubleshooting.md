@@ -400,6 +400,14 @@ On GNOME, the system installer also creates a native custom shortcut whose comma
 node scripts/configure-gnome-shortcut.mjs
 ```
 
+On KDE Wayland, approve the Global Shortcuts portal request if it appears. On XFCE, Cinnamon, MATE, LXQt, or a compositor without the portal, create a manual keyboard shortcut with command `/usr/local/bin/lclip --show` and binding `Super + .`. This difference is controlled by the desktop environment, not by whether the distribution is Ubuntu, Fedora, Debian, Arch, or openSUSE.
+
+### GitHub or email does not open from Settings
+
+**Cause:** LClip blocks arbitrary renderer navigation for security. Only exact approved external destinations are delegated to the operating system.
+
+**Solution:** Update and reinstall LClip. The Connect & contribute section permits the exact repository `https://github.com/Sanal-Sivakumar/Lclip` and `mailto:sanalsiva2005@gmail.com`. Confirm that the desktop has a default browser and mail handler configured.
+
 ### The shortcut works on X11 but not Wayland
 
 **Cause:** X11 permits direct global grabs, while Wayland delegates policy to the compositor and portals.

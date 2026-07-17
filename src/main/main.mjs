@@ -100,7 +100,10 @@ function createWindow() {
     if (pendingShow) showWindow();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https:\/\/(?:developers\.giphy\.com|giphy\.com)\//.test(url)) shell.openExternal(url);
+    const allowed = url === "https://github.com/Sanal-Sivakumar/Lclip"
+      || url === "mailto:sanalsiva2005@gmail.com"
+      || /^https:\/\/(?:developers\.giphy\.com|giphy\.com)\//.test(url);
+    if (allowed) shell.openExternal(url);
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", event => event.preventDefault());

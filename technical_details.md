@@ -25,6 +25,8 @@ LClip primarily targets:
 
 Other environments include XFCE, Cinnamon, MATE, and LXQt. LClip's autostart file lists several environments, but the project's main integration target is GNOME and KDE.
 
+Distribution and desktop environment are separate choices. Ubuntu commonly ships GNOME, Kubuntu ships KDE Plasma, and Fedora provides both GNOME and KDE editions. Shortcut integration therefore branches by desktop/session: GNOME receives a native `gsettings` entry, KDE Wayland uses the XDG Global Shortcuts portal, X11 desktops use Electron's direct X11 registration, and other Wayland compositors require a compatible portal or a manual desktop binding to `/usr/local/bin/lclip --show`.
+
 ### Display server and compositor
 
 Applications need a system that draws windows, routes mouse and keyboard input, and tracks which window has focus.
@@ -178,6 +180,8 @@ The renderer cannot import Node.js modules because `nodeIntegration` is disabled
 `src/preload/preload.cjs` runs in a special isolated context. It creates a small `window.lclip` API with functions such as `bootstrap`, `activate`, `clearHistory`, `saveSettings`, and `searchGifs`.
 
 This is safer than exposing all of Electron. The renderer can request an approved action but cannot execute an arbitrary system command.
+
+External Settings links follow the same narrow-boundary design. Electron denies new windows by default and delegates only the exact LClip GitHub URL, the developer's exact `mailto:` address, and GIPHY developer pages to the operating system through `shell.openExternal`. Arbitrary renderer-provided URLs are not accepted.
 
 ### IPC
 
