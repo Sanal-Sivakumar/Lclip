@@ -126,7 +126,7 @@ function positionWindow() {
   );
 }
 
-function showWindow() {
+function revealWindow(resetToHistory) {
   if (!window || window.isDestroyed()) return;
   if (!rendererReady) {
     pendingShow = true;
@@ -139,7 +139,15 @@ function showWindow() {
   }
   window.show();
   window.focus();
-  window.webContents.send("lclip:open");
+  if (resetToHistory) window.webContents.send("lclip:open");
+}
+
+function showWindow() {
+  revealWindow(true);
+}
+
+function restoreWindowAfterPaste() {
+  revealWindow(false);
 }
 
 function toggleWindow() {
@@ -180,7 +188,7 @@ async function pasteIntoPreviousApp(waitMilliseconds) {
   } finally {
     await delay(80);
     activationInProgress = false;
-    if (reopenPicker) showWindow();
+    if (reopenPicker) restoreWindowAfterPaste();
   }
 }
 

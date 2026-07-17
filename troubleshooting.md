@@ -650,6 +650,12 @@ The two revisions must match. If they do but the old footer is visible, capture 
 
 **Solution:** Update and restart LClip. Current builds briefly hide for automatic paste and then reopen the existing picker at the same position. You can choose several records or characters in sequence. Click the top-right close button, press `Esc`, or click outside LClip when finished.
 
+### A fresh Super + . opening returns to the previously used tab
+
+**Cause:** Earlier builds cleared Search on `lclip:open` but did not change the renderer's active mode. Emoji, GIFs, Kaomoji, Symbols, or an open Settings sheet could therefore carry into a later invocation.
+
+**Solution:** Current builds distinguish a fresh global invocation from the automatic reopen used by the working paste flow. A fresh `Super + .` invocation always opens Clipboard History at the top with Search cleared. The internal reopen after paste preserves the current mode so repeated selections remain convenient.
+
 ### The wallpaper is too visible through the window
 
 **Cause:** Compositor blur differs between GNOME, KDE, X11, Wayland, GPU drivers, and desktop effects. The older material also used a more transparent base.

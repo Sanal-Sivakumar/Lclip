@@ -73,6 +73,8 @@ At startup, LClip asks Electron and the Linux desktop to register `Super + .` as
 
 On GNOME, the installer also creates a native desktop custom shortcut for the same `Super + .` chord. It executes `/usr/local/bin/lclip --show`, so the shortcut remains available even when Electron's Wayland portal registration is unavailable. It does not create `Super+V`, `Ctrl+V`, or any alternative binding.
 
+Every fresh `Super + .` opening starts on **Clipboard history**, clears the previous search/category selection, closes Settings if necessary, and scrolls History to the top. The automatic reopen that follows a paste is part of the current interaction and does not perform this reset.
+
 ### Selecting and pasting an item
 
 When an item is selected, LClip:

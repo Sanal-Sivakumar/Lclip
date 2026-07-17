@@ -87,7 +87,7 @@ Command: /usr/local/bin/lclip --show
 Binding: <Super>period
 ```
 
-The script reads the current custom-keybinding array, preserves every existing entry, and adds LClip's dedicated path. It never binds `Ctrl+V`, `Super+V`, or an alternative chord. The uninstaller removes only LClip's binding path. Electron registration and the GNOME command can both call `showWindow`; repeated show requests are idempotent and do not toggle the picker closed.
+The script reads the current custom-keybinding array, preserves every existing entry, and adds LClip's dedicated path. It never binds `Ctrl+V`, `Super+V`, or an alternative chord. The uninstaller removes only LClip's binding path. Electron registration and the GNOME command can both call `showWindow`; repeated show requests are idempotent and do not toggle the picker closed. A fresh external show emits `lclip:open`, which selects Clipboard History, clears Search and category state, closes Settings, resets keyboard selection, and scrolls History to the top.
 
 ### Clipboard and selection
 
@@ -193,7 +193,7 @@ On Wayland sessions, both the installed launcher and the in-process backend sele
 
 ### Focus and repeated activation
 
-Selecting a result does not destroy or recreate the picker process. The main process sets an `activationInProgress` guard, hides the `BrowserWindow`, waits for the previous application to regain focus, and invokes the paste bridge. It then calls `showWindow()` on the existing window after an 80-millisecond settling interval. This restores the exact activation technique from commit `78a7701`, where automatic paste was confirmed working. The Xwayland launcher and native draggable-region changes remain independent of this paste flow.
+Selecting a result does not destroy or recreate the picker process. The main process sets an `activationInProgress` guard, hides the `BrowserWindow`, waits for the previous application to regain focus, and invokes the paste bridge. After an 80-millisecond settling interval it calls `restoreWindowAfterPaste()`, which reveals the existing window without emitting the fresh-open reset event. This preserves the active mode during a repeated-selection session while retaining the exact focus handoff from commit `78a7701`, where automatic paste was confirmed working. The Xwayland launcher and native draggable-region changes remain independent of this paste flow.
 
 The default Wayland installation uses Xwayland whenever available so draggable positioning works consistently. Paste still hides the picker briefly because the target application may be a native Wayland window that X11 focus APIs cannot activate directly.
 

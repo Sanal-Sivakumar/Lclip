@@ -349,12 +349,9 @@ document.addEventListener("keydown", event => {
 
 api.onState(next => { state.data = next; render(); });
 api.onOpen(() => {
-  state.query = "";
-  state.selectedIndex = 0;
-  $("#searchInput").value = "";
   closeSettings();
-  render();
-  $("#searchInput").focus();
+  setMode("clipboard");
+  $("#results").scrollTop = 0;
 });
 
 state.data = await api.bootstrap();
