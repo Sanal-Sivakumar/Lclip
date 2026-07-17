@@ -186,7 +186,6 @@ async function pasteIntoPreviousApp(waitMilliseconds) {
       window.blur();
     }
     await delay(waitMilliseconds);
-    if (pickerWasVisible && window && !window.isDestroyed() && window.isFocused()) return false;
     return await pasteWithBridge(bridge);
   } finally {
     await delay(80);

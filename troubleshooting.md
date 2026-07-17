@@ -606,7 +606,13 @@ If the picker still visibly restarts, verify the installed build in Settings and
 
 **Cause:** The first keep-open implementation rejected every native-Wayland activation before calling the already-working paste bridge. Backend selection could also mistake Electron's own ozone setting for an explicit native-Wayland request, leaving both focus handoff and movement unavailable.
 
-**Solution:** Current builds force the picker through Xwayland whenever a Wayland session exposes `DISPLAY`; only `LCLIP_NATIVE_WAYLAND=1` opts out. The installed launcher passes `--ozone-platform=x11` before Electron initializes, while the application repeats the selection as a safeguard. The picker now temporarily becomes non-focusable, yields focus without hiding, verifies that the handoff succeeded, pastes, and restores focusability. Reinstall the application so both the launcher and resident process receive the correction.
+**Solution:** Current builds force the picker through Xwayland whenever a Wayland session exposes `DISPLAY`; only `LCLIP_NATIVE_WAYLAND=1` opts out. The installed launcher passes `--ozone-platform=x11` before Electron initializes, while the application repeats the selection as a safeguard. The picker temporarily becomes non-focusable, yields focus without hiding, calls the paste bridge without relying on Electron's briefly stale `isFocused()` result, and restores focusability. Reinstall the application so both the launcher and resident process receive the correction.
+
+### Dragging works but selection still reports automatic paste unavailable
+
+**Cause:** The first corrected Xwayland build checked `BrowserWindow.isFocused()` immediately after making the picker non-focusable. On some GNOME/Electron combinations that query remains true briefly even though focus is already transitioning, so LClip returned before it ever called `ydotool`.
+
+**Solution:** Current builds keep the picker non-focusable during injection but no longer use that stale query as a gate. The detected bridge is always attempted after the focus-settling delay.
 
 ### The removed footer still appears
 
