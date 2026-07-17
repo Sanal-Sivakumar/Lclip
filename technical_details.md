@@ -97,7 +97,7 @@ Linux can also have a primary selection, commonly pasted with the middle mouse b
 
 ### Focus
 
-The focused application receives keyboard input. When LClip opens, it temporarily becomes focused. Before automatic paste, it remains visible, temporarily becomes non-focusable, calls `blur()`, and waits 150 milliseconds so the previous application can become active again. LClip does not gate paste on `BrowserWindow.isFocused()` because Electron can report stale focus state during this asynchronous transition. Since the picker is non-focusable during injection, generated input cannot enter its own Search field. After the paste bridge finishes, LClip leaves an additional 80-millisecond settling interval before restoring focusability and refocusing the same picker for another selection. A normal focus loss caused by clicking outside still dismisses it.
+The focused application receives keyboard input. When LClip opens, it temporarily becomes focused. Before automatic paste, it hides and waits 150 milliseconds so GNOME/KDE can make the previous application active again. This is the activation method proven to work on the reference GNOME Wayland system; keeping the picker visible or merely marking it non-focusable did not reliably transfer focus. After the paste bridge finishes, LClip leaves an additional 80-millisecond settling interval before reopening the picker for another selection. A normal focus loss caused by clicking outside still dismisses it.
 
 ## 3. Why LClip starts after login
 
@@ -193,9 +193,9 @@ On Wayland sessions, both the installed launcher and the in-process backend sele
 
 ### Focus and repeated activation
 
-Selecting a result does not hide, destroy, or recreate the picker. The main process sets an `activationInProgress` guard, temporarily marks the picker non-focusable, calls `BrowserWindow.blur()`, and waits for the desktop to return focus to the previous application. It then invokes the paste bridge, restores focusability, and focuses the same visible `BrowserWindow`. The non-focusable state prevents generated input from entering LClip even if Electron's focus-status query has not updated yet. Because `showWindow()` and the `lclip:open` reset event are not used during this flow, the current mode, query, scroll position, and selection remain intact. The blur-to-hide listener ignores the deliberate intermediate blur while the guard is active; a later real click outside still hides the picker normally.
+Selecting a result does not destroy or recreate the picker process. The main process sets an `activationInProgress` guard, hides the `BrowserWindow`, waits for the previous application to regain focus, and invokes the paste bridge. It then calls `showWindow()` on the existing window after an 80-millisecond settling interval. This restores the exact activation technique from commit `78a7701`, where automatic paste was confirmed working. The Xwayland launcher and native draggable-region changes remain independent of this paste flow.
 
-The default Wayland installation uses Xwayland whenever available so draggable positioning and focus handoff work consistently. On a compositor that cannot transfer focus while the picker remains visible, LClip leaves the item copied and reports the manual-paste fallback instead of injecting text into itself.
+The default Wayland installation uses Xwayland whenever available so draggable positioning works consistently. Paste still hides the picker briefly because the target application may be a native Wayland window that X11 focus APIs cannot activate directly.
 
 ### Scroll containment
 
@@ -251,7 +251,7 @@ The system installer records the checkout's 12-character Git revision in `/opt/l
 4. The value is also moved to the front of history.
 5. The visible window yields focus and waits 150 milliseconds.
 6. The paste bridge sends `Ctrl+V`; if it fails, the next detected bridge is attempted.
-7. After an 80-millisecond focus-settling interval, LClip refocuses the same still-visible picker for another selection.
+7. After an 80-millisecond focus-settling interval, LClip reopens and refocuses the existing picker for another selection.
 8. If every bridge fails, LClip leaves the value copied, displays a notification, and shows a manual-paste instruction as a temporary in-window toast.
 
 ### GIF flow

@@ -171,32 +171,16 @@ function startClipboardMonitor() {
 }
 
 async function pasteIntoPreviousApp(waitMilliseconds) {
-  const pickerWasVisible = Boolean(window?.isVisible());
-  let focusabilityChanged = false;
+  const reopenPicker = Boolean(window?.isVisible());
   activationInProgress = true;
+  window?.hide();
   try {
-    if (pickerWasVisible && window && !window.isDestroyed()) {
-      try {
-        window.setFocusable(false);
-        focusabilityChanged = true;
-      } catch {
-        // Some window managers only support blur; the focus check below still
-        // prevents accidental paste into LClip itself.
-      }
-      window.blur();
-    }
     await delay(waitMilliseconds);
     return await pasteWithBridge(bridge);
   } finally {
     await delay(80);
-    if (focusabilityChanged && window && !window.isDestroyed()) {
-      try { window.setFocusable(true); } catch {}
-    }
     activationInProgress = false;
-    if (pickerWasVisible && window && !window.isDestroyed() && window.isVisible()) {
-      window.focus();
-      window.webContents.focus();
-    }
+    if (reopenPicker) showWindow();
   }
 }
 

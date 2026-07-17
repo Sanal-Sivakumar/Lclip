@@ -78,12 +78,12 @@ On GNOME, the installer also creates a native desktop custom shortcut for the sa
 When an item is selected, LClip:
 
 1. Writes the selected value to the normal system clipboard.
-2. Keeps the picker visible and temporarily yields keyboard focus to the previous application.
-3. Waits briefly for the desktop to complete that focus change.
+2. Briefly hides the picker so GNOME/KDE can restore keyboard focus to the previous application.
+3. Waits for the desktop to complete that focus change.
 4. Uses the best available input bridge to send the normal `Ctrl+V` paste action.
-5. Returns focus to the same still-open picker without resetting its mode, search, scroll position, or selection.
+5. Reopens the picker in the same position for another selection.
 
-LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. Before invoking a bridge, it temporarily makes the visible picker non-focusable so generated input cannot be pasted into LClip itself. It does not rely on Electron's asynchronous `isFocused()` result, which can remain stale briefly after the handoff. If Linux blocks automatic input or no bridge is installed, the item is still copied safely and LClip asks the user to focus the target application and press `Ctrl+V` manually. The picker remains available for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
+LClip prefers `ydotool`, then `wtype` on Wayland, then `xdotool`. Hiding before injection is required on desktops where a visible frameless picker retains focus even after Electron marks it non-focusable. If Linux blocks automatic input or no bridge is installed, the item is still copied safely and LClip asks the user to press `Ctrl+V` manually. The picker reopens for multiple selections; click its close button, press `Esc`, or click another application to dismiss it.
 
 ### Window, scrolling, and character browsing
 
@@ -259,7 +259,7 @@ LClip attempts the installed bridges in this order:
 2. `wtype`, when the Wayland compositor supports its virtual-keyboard protocol;
 3. `xdotool`, for X11 or compatible Xwayland targets.
 
-If one bridge fails, LClip tries the next. If all fail, the selected item remains on the clipboard, the picker remains visible, and LClip asks you to focus the target application and press `Ctrl+V`. This is a safe fallback rather than data loss.
+If one bridge fails, LClip tries the next. If all fail, the selected item remains on the clipboard, the picker reopens, and LClip asks you to press `Ctrl+V`. This is a safe fallback rather than data loss.
 
 Ubuntu 24.04 currently supplies `ydotool 0.1.8`, which uses symbolic shortcuts such as `ydotool key ctrl+v`. Modern ydotool 1.x uses explicit Linux key-code press/release events. LClip detects the installed syntax: it sends symbolic `ctrl+v` to 0.x and numeric key events to 1.x. This prevents old versions from typing digits instead of pasting.
 

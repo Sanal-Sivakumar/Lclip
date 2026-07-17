@@ -10,7 +10,7 @@ Linux users on GNOME, KDE Plasma, and compatible X11 or Wayland desktops who reg
 
 ## Product Purpose
 
-LClip is a system-integrated clipboard history and character picker activated only by `Super + .`. It continuously monitors the text clipboard after graphical login, stores at most the 10 most recent copied text values locally, and presents clipboard history, emoji, kaomoji, GIFs, and special characters in one compact window. Choosing an item copies it and immediately pastes it into the previously focused application when the Linux session permits input injection, while the same picker remains visible and ready for another selection.
+LClip is a system-integrated clipboard history and character picker activated only by `Super + .`. It continuously monitors the text clipboard after graphical login, stores at most the 10 most recent copied text values locally, and presents clipboard history, emoji, kaomoji, GIFs, and special characters in one compact window. Choosing an item copies it, briefly yields the picker so the previous application can regain focus, immediately pastes when the Linux session permits input injection, and reopens the existing picker for another selection.
 
 ## Brand Personality
 

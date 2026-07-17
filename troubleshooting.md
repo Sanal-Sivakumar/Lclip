@@ -11,7 +11,7 @@ This document records the important development problems addressed in LClip and 
 | Electron aborted on `chrome-sandbox` | Helper ownership/mode was unsafe after copying | Installer applies `root:root` ownership and mode `4755` |
 | `Super + .` did not open the picker | Electron/Wayland portal registration was unavailable or conflicted | GNOME-native custom shortcut plus Electron registration of the same chord |
 | First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
-| Picker disappeared after one selection | Earlier activation hid and reopened the picker to yield focus for paste | Paste now yields focus without hiding the visible picker |
+| Picker disappeared permanently after one selection | Earlier activation hid the picker but did not reopen it | The proven hide-and-paste flow now reopens the existing picker after every attempt |
 | “Automatic paste is unavailable” | Bridge executable existed but its service/protocol/device permission failed | Ordered bridge fallback and optional restricted `ydotool` `/dev/uinput` configuration |
 | Selecting history typed digits such as `2442` | Ubuntu ydotool 0.1.8 received the incompatible ydotool 1.x numeric event syntax | Runtime version detection selects symbolic `ctrl+v` for 0.x and numeric events for 1.x |
 | Window remained immovable even with a visible drag strip | The strip was incorrectly marked `no-drag`, while its JavaScript cursor-tracking fallback was unreliable | Electron's native draggable-region contract on X11/Xwayland, with the close button excluded |
@@ -494,7 +494,7 @@ Expected signals:
 - a `ydotool` or `ydotoold` user service is active, when supplied by the distribution.
 - otherwise, the installer-created `lclip-ydotoold.service` is active.
 
-The picker now remains visible while attempting paste. On X11/Xwayland it briefly yields keyboard focus, pastes into the previous application, and refocuses the same window without resetting it. After a failed attempt, the selected value remains on the clipboard and a desktop notification asks you to focus the target application and paste manually.
+The picker briefly hides while attempting paste so the desktop can restore the previous application's focus. It reopens after the attempt. After a failed attempt, the selected value remains on the clipboard and a desktop notification asks you to paste manually.
 
 ### `ydotool` is installed but paste fails
 
@@ -598,7 +598,7 @@ Pure native Wayland is still available by setting `LCLIP_NATIVE_WAYLAND=1`, but 
 
 **Cause:** Earlier builds implemented automatic paste by hiding the picker, waiting for the previous application to regain focus, sending `Ctrl+V`, and calling `showWindow()` again. That created a visible close/reopen cycle and reset transient interface state.
 
-**Solution:** Current builds keep the same window visible. On X11/Xwayland, LClip deliberately blurs it while an activation guard suppresses the normal outside-click dismissal, performs the paste, and then refocuses that same window. The picker should retain its mode, search query, scroll position, and selection. It hides only after a normal click outside, the close button, or `Esc`.
+**Solution:** Current builds use the proven focus handoff: LClip hides the existing window, performs the paste after the target regains focus, and reopens that window. It does not destroy the process. The picker remains available for repeated selections and closes permanently only after a normal click outside, the close button, or `Esc`.
 
 If the picker still visibly restarts, verify the installed build in Settings and fully reinstall; an old resident Electron process continues running old JavaScript even after files on disk are replaced.
 
@@ -606,13 +606,13 @@ If the picker still visibly restarts, verify the installed build in Settings and
 
 **Cause:** The first keep-open implementation rejected every native-Wayland activation before calling the already-working paste bridge. Backend selection could also mistake Electron's own ozone setting for an explicit native-Wayland request, leaving both focus handoff and movement unavailable.
 
-**Solution:** Current builds force the picker through Xwayland whenever a Wayland session exposes `DISPLAY`; only `LCLIP_NATIVE_WAYLAND=1` opts out. The installed launcher passes `--ozone-platform=x11` before Electron initializes, while the application repeats the selection as a safeguard. The picker temporarily becomes non-focusable, yields focus without hiding, calls the paste bridge without relying on Electron's briefly stale `isFocused()` result, and restores focusability. Reinstall the application so both the launcher and resident process receive the correction.
+**Solution:** Current builds force the picker through Xwayland whenever a Wayland session exposes `DISPLAY`; only `LCLIP_NATIVE_WAYLAND=1` opts out. The installed launcher passes `--ozone-platform=x11` before Electron initializes, while the application repeats the selection as a safeguard. Paste uses the confirmed hide, wait, inject, and reopen sequence instead of relying on focus-state APIs. Reinstall the application so both the launcher and resident process receive the correction.
 
 ### Dragging works but selection still reports automatic paste unavailable
 
-**Cause:** The first corrected Xwayland build checked `BrowserWindow.isFocused()` immediately after making the picker non-focusable. On some GNOME/Electron combinations that query remains true briefly even though focus is already transitioning, so LClip returned before it ever called `ydotool`.
+**Cause:** The keep-open experiments tried `blur()` and `setFocusable(false)` while leaving the frameless picker visible. On the reference GNOME Wayland system, those operations did not reliably activate the previous native application, so the bridge had no valid paste target.
 
-**Solution:** Current builds keep the picker non-focusable during injection but no longer use that stale query as a gate. The detected bridge is always attempted after the focus-settling delay.
+**Solution:** Current builds restore the proven commit-`78a7701` sequence: hide the picker, wait 150 milliseconds, invoke the bridge, wait 80 milliseconds, and reopen the existing picker. The newer Xwayland startup and native draggable-region changes remain in place, so dragging stays fixed.
 
 ### The removed footer still appears
 
@@ -648,7 +648,7 @@ The two revisions must match. If they do but the old footer is visible, capture 
 
 **Cause:** An older build hid the window to return focus to the previous application but did not restore it afterward.
 
-**Solution:** Update and restart LClip. Current builds keep the picker visible, briefly yield focus for automatic paste, and then refocus the same window without resetting it. You can choose several records or characters in sequence. Click the top-right close button, press `Esc`, or click outside LClip when finished.
+**Solution:** Update and restart LClip. Current builds briefly hide for automatic paste and then reopen the existing picker at the same position. You can choose several records or characters in sequence. Click the top-right close button, press `Esc`, or click outside LClip when finished.
 
 ### The wallpaper is too visible through the window
 
