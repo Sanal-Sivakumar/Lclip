@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LClip - The Ultimate Linux Clipboard & Expression Picker</title>
+    <meta name="description" content="A private, system-integrated clipboard history and expression picker for Linux.">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">
+                <img src="assets/logo.svg" alt="LClip Logo" width="32" height="32">
+                <span>LClip</span>
+            </div>
+            <div class="nav-links">
+                <a href="https://github.com/Sanal-Sivakumar/Lclip" target="_blank" class="github-btn">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero reveal">
+            <div class="hero-content">
+                <span class="shortcut-badge"><kbd>Super</kbd> + <kbd>.</kbd></span>
+                <h1 class="hero-title">Your clipboard & expressions.<br>One shortcut away.</h1>
+                <p class="hero-subtitle">A private, system-integrated clipboard history and expression picker designed natively for Linux.</p>
+                <div class="hero-actions">
+                    <a href="https://github.com/Sanal-Sivakumar/Lclip#install-on-linux" class="btn primary-btn">Install for Linux</a>
+                    <a href="https://github.com/Sanal-Sivakumar/Lclip/blob/main/technical_details.md" class="btn secondary-btn">Technical Details</a>
+                </div>
+            </div>
+            <div class="hero-image-container reveal">
+                <img src="assets/hero_ui.jpg" alt="LClip Hero UI Mockup" class="mockup-img">
+            </div>
+        </section>
+
+        <section class="features-grid">
+            <div class="feature-row reverse reveal">
+                <div class="feature-text">
+                    <h2 class="gradient-text">Refined Glassmorphism.</h2>
+                    <p>Everything in one floating glass pane. We've crafted a premium, highly translucent dark mode that seamlessly blends with your wallpaper.</p>
+                    <ul class="feature-list callout-list">
+                        <li><strong>Clean Interface:</strong> Search bar is decluttered by removing shortcut hints. The LClip logo is now clickable, taking you straight back to your history.</li>
+                        <li><strong>Context Aware:</strong> Clipboard history now displays the exact source application (like VS Code or Firefox) and the precise time you copied it.</li>
+                        <li><strong>Translucent Depth:</strong> A lighter, more translucent backdrop inspired by premium modern OS designs.</li>
+                    </ul>
+                </div>
+                <div class="feature-visual">
+                    <img src="assets/hero_ui.jpg" alt="LClip Clipboard History UI" class="mockup-img small">
+                </div>
+            </div>
+
+            <div class="feature-row reveal">
+                <div class="feature-text">
+                    <h2 class="gradient-text">Express yourself faster.</h2>
+                    <p>An extensive, categorized offline library of expressions, completely redesigned for a premium selection experience.</p>
+                    <ul class="feature-list callout-list">
+                        <li><strong>Immersive Grid:</strong> Now featuring exactly 9 emojis per row, with text labels removed for a cleaner, high-density look.</li>
+                        <li><strong>Minimal Navigation:</strong> Tabs (History, Emoji, Symbols, Kaomoji) are now icon-only and spaced elegantly away from the logo.</li>
+                        <li><strong>Fast Keyboard Workflow:</strong> Search, arrow navigation, and Enter to paste without lifting a finger.</li>
+                    </ul>
+                </div>
+                <div class="feature-visual">
+                    <img src="assets/emoji_ui.jpg" alt="LClip Emoji Picker UI" class="mockup-img small">
+                </div>
+            </div>
+        </section>
+
+        <section class="privacy-section reveal">
+            <div class="privacy-card">
+                <h2>Privacy & Desktop Integration First</h2>
+                <p>LClip is not a keylogger. It registers one explicit global chord and keeps clipboard history local, bounded, and secure. It degrades gracefully on strict Wayland security policies while attempting the best input bridge (<code>ydotool</code>, <code>wtype</code>, or <code>xdotool</code>).</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p>LClip is open source software licensed under GPL-3.0-only.</p>
+            <div class="footer-links">
+                <a href="https://github.com/Sanal-Sivakumar/Lclip">GitHub Repository</a>
+                <a href="https://github.com/Sanal-Sivakumar/Lclip/blob/main/troubleshooting.md">Troubleshooting</a>
+                <a href="https://github.com/Sanal-Sivakumar/Lclip/blob/main/PRODUCT.md">Product Vision</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/animations.js"></script>
+</body>
+</html>
