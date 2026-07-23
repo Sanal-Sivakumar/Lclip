@@ -479,7 +479,7 @@ Clipboard managers are inherently sensitive because copied text can contain secr
 
 ## GitHub and releases
 
-CI runs syntax, state, IPC, network-boundary, desktop-status, release-contract, and catalog tests; audits the dependency graph; then builds and launches the packaged application under Xvfb on native x86-64 and ARM64 runners. A matching stable tag publishes AppImage, Debian, RPM, and portable tar.gz artifacts for both architectures, plus the no-root installer, checksum manifest, and build-provenance attestations.
+CI runs syntax, state, IPC, network-boundary, desktop-status, release-contract, and catalog tests; audits the dependency graph; then builds and launches the packaged application under Xvfb on native x86-64 and ARM64 runners. A matching stable tag publishes AppImage, Debian, RPM, and portable tar.gz artifacts for both architectures, plus the no-root installer, checksum manifest, and build-provenance attestations. After publication, fresh native x86-64 and ARM64 runners download the public installer, install without root into an isolated home directory, launch that exact installed runtime, and exercise the public uninstaller.
 
 ```bash
 npm run verify

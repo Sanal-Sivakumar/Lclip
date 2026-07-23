@@ -38,11 +38,16 @@ if (!actualTag && !allowUntagged) {
 
 const isPrerelease = packageJson.version.includes("-");
 const stableContractChecks = [
+  [Boolean(packageJson.author?.name && packageJson.author?.email), "Linux package maintainer identity"],
+  [packageJson.desktopName === "io.lclip.LClip.desktop", "Electron desktop window identity"],
+  [packageJson.build?.linux?.syncDesktopName === true, "synchronized Linux desktop filename"],
   [releaseWorkflow.includes("runner: ubuntu-24.04-arm"), "native ARM64 release runner"],
   [releaseWorkflow.includes("for extension in AppImage deb rpm tar.gz"), "complete Linux release format set"],
   [releaseWorkflow.includes("smoke-packaged-linux.sh"), "packaged runtime smoke test"],
   [releaseWorkflow.includes("SHA256SUMS"), "release checksums"],
   [releaseWorkflow.includes("uses: actions/attest@v4"), "release provenance attestations"],
+  [releaseWorkflow.includes("verify-published:"), "public installer verification job"],
+  [releaseWorkflow.includes("./install-lclip.sh --release"), "public no-root install exercise"],
   [packageJson.build?.linux?.target?.includes("tar.gz"), "portable tar.gz build target"],
   [smokeChecklist.includes("Core fallback contract"), "documented desktop fallback contract"],
   [smokeChecklist.includes("CI-enforced"), "documented CI-enforced architecture checks"],

@@ -11,8 +11,9 @@ LClip publishes immutable Git tags only after the exact `main` commit passes the
 5. Create one annotated tag matching the package version. Never move or recreate a published tag.
 6. Wait for the release workflow to build AppImage, Debian, RPM, and portable tar.gz files on both native architectures.
 7. Confirm the release also contains `install-lclip.sh`, `uninstall-lclip.sh`, `LClip.svg`, `SHA256SUMS`, and GitHub provenance attestations.
-8. Download at least one artifact independently, verify its checksum, and confirm the latest-download links in `README.md` resolve.
-9. Record compositor-specific observations in `docs/linux-smoke-test.md` without converting missing evidence into a pass claim.
+8. Wait for the post-publication x86-64 and ARM64 jobs to download the public installer, install into an isolated home directory without root, launch the downloaded runtime, and uninstall it cleanly.
+9. Download at least one artifact independently, verify its checksum, and confirm the latest-download links in `README.md` resolve.
+10. Record compositor-specific observations in `docs/linux-smoke-test.md` without converting missing evidence into a pass claim.
 
 ```bash
 npm ci
@@ -39,7 +40,7 @@ Stable tags publish predictable names so `/releases/latest/download/…` links r
 | x86-64 | `LClip-linux-x64.tar.gz` | `LClip-linux-x64.AppImage` | `LClip-linux-x64.deb` | `LClip-linux-x64.rpm` |
 | ARM64 | `LClip-linux-arm64.tar.gz` | `LClip-linux-arm64.AppImage` | `LClip-linux-arm64.deb` | `LClip-linux-arm64.rpm` |
 
-The release also publishes `install-lclip.sh`, `uninstall-lclip.sh`, `LClip.svg`, and `SHA256SUMS`. GitHub Actions generates provenance attestations for the published files. Distribution-specific GPG package signing is not currently configured, so the checksum and GitHub attestation are the documented integrity paths.
+The release also publishes `install-lclip.sh`, `uninstall-lclip.sh`, `LClip.svg`, and `SHA256SUMS`. GitHub Actions generates provenance attestations for the published files, then native x86-64 and ARM64 jobs exercise the public no-root install, packaged-runtime launch, and uninstall paths. Distribution-specific GPG package signing is not currently configured, so the checksum and GitHub attestation are the documented integrity paths.
 
 ## Rollback and recovery
 

@@ -144,3 +144,65 @@ jobs:
             The no-root `install-lclip.sh` path uses the portable archive and does not require Node.js, npm, or FUSE. AppImage, Debian, RPM, and tar.gz files are also available for manual installation.
 
             Verify downloads against `SHA256SUMS`. Both architectures are built natively and the packaged runtime is launched under Xvfb before publication. Desktop-specific shortcut and automatic-paste behavior still follows the support policy in `docs/linux-smoke-test.md`.
+
+  verify-published:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish
+    name: Verify public ${{ matrix.arch }} installation
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install headless runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb dbus-x11
+
+      - name: Download the published installer and uninstaller
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          curl --fail --location --show-error --silent --retry 5 --retry-all-errors \
+            "${release_url}/install-lclip.sh" --output install-lclip.sh
+          curl --fail --location --show-error --silent --retry 5 --retry-all-errors \
+            "${release_url}/uninstall-lclip.sh" --output uninstall-lclip.sh
+          chmod 0755 install-lclip.sh uninstall-lclip.sh
+
+      - name: Install from the public release without root
+        shell: bash
+        env:
+          HOME: ${{ runner.temp }}/lclip-home
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME"
+          ./install-lclip.sh --release "${GITHUB_REF_NAME#v}" --no-autostart
+          test -x "$HOME/.local/opt/lclip/lclip"
+          test -x "$HOME/.local/bin/lclip"
+          test -f "$HOME/.local/opt/lclip/resources/LCLIP_PORTABLE_INSTALL"
+
+      - name: Launch the publicly installed application under Xvfb
+        shell: bash
+        env:
+          HOME: ${{ runner.temp }}/lclip-home
+        run: bash scripts/smoke-packaged-linux.sh "$HOME/.local/opt/lclip"
+
+      - name: Uninstall without deleting user state
+        shell: bash
+        env:
+          HOME: ${{ runner.temp }}/lclip-home
+        run: |
+          set -euo pipefail
+          ./uninstall-lclip.sh
+          test ! -e "$HOME/.local/opt/lclip"
+          test ! -e "$HOME/.local/bin/lclip"

@@ -14,7 +14,7 @@ LClip 1.0 meets the repository's stable-release contract: the supported core has
 - Settings independently reports Electron registration, Wayland portal routing, GNOME-native configuration, per-user startup, paste-bridge availability, and persistence.
 - The no-root installer verifies release checksums, stages the portable archive, backs up user integration, and restores the prior installation after an activation failure.
 - The source installer stages `/opt/lclip`, backs up shared and per-user integration, restores the previous bundle and resident process after required failures, and never runs the clipboard application as root.
-- CI builds on native x86-64 and ARM64 Ubuntu runners. Each packaged runtime must report readiness, remain resident for five seconds, and shut down cleanly under Xvfb. Tagged releases add AppImage, Debian, RPM, and tar.gz artifacts, stable filenames, SHA-256 checksums, and provenance attestations.
+- CI builds on native x86-64 and ARM64 Ubuntu runners. Each packaged runtime must report readiness, remain resident for five seconds, and shut down cleanly under Xvfb. Tagged releases add AppImage, Debian, RPM, and tar.gz artifacts, stable filenames, SHA-256 checksums, and provenance attestations; post-publication jobs then download, install, launch, and uninstall the public portable release on both native architectures.
 - The historical `.venv/` payload was removed from every rewritten repository ref; the recovery bundle remains private and outside the repository.
 
 ## Local evidence

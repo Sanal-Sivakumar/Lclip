@@ -380,7 +380,7 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 
 ### Electron Builder
 
-**electron-builder** packages source code, Electron, and application metadata into distributable Linux artifacts. LClip supports:
+**electron-builder** packages source code, Electron, and application metadata into distributable Linux artifacts. The package records a real maintainer name and email for Debian/RPM metadata, and synchronizes `io.lclip.LClip.desktop` with Electron's Linux application ID and `StartupWMClass` so desktop shells can associate a running window with its launcher. LClip supports:
 
 - **unpacked directory** — useful for system installation and inspection;
 - **AppImage** — a portable executable image used by many Linux distributions;
@@ -436,7 +436,7 @@ Before packaging, the installer removes `dist/` so an old unpacked bundle cannot
 - the offline emoji, kaomoji, and symbol catalogs meet their minimum sizes, contain searchable metadata, and do not duplicate values.
 - Wayland sessions choose Xwayland only when it is available and the user has not requested native Wayland.
 
-The current suite contains 30 automated tests covering state, persistence, autostart, IPC, GIPHY bounds and cancellation, the stable release contract, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. CI additionally builds and launches the packaged runtime under Xvfb on native x86-64 and ARM64 runners. These checks do not fabricate portal approval, focus transfer, input injection, or window-drag evidence; real-desktop observations remain documented in `docs/linux-smoke-test.md`, while copy-first manual fallback is part of the stable contract.
+The current suite contains 30 automated tests covering state, persistence, autostart, IPC, GIPHY bounds and cancellation, the stable release contract, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. CI additionally builds and launches the packaged runtime under Xvfb on native x86-64 and ARM64 runners. Tagged releases finish with native jobs that download the public installer, install it without root into an isolated home directory, launch the downloaded runtime, and exercise the public uninstaller. These checks do not fabricate portal approval, focus transfer, input injection, or window-drag evidence; real-desktop observations remain documented in `docs/linux-smoke-test.md`, while copy-first manual fallback is part of the stable contract.
 
 ## 11. License and copyleft
 
