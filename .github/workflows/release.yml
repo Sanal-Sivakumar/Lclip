@@ -107,25 +107,7 @@ jobs:
 
       - name: Create stable asset names and checksums
         shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p release/publish
-          for arch in x64 arm64; do
-            source_dir="release/downloads/lclip-linux-${arch}-installers"
-            for extension in AppImage deb rpm tar.gz; do
-              source_file="$(find "${source_dir}" -type f -name "*.${extension}" -print -quit)"
-              if [[ -z "${source_file}" ]]; then
-                echo "Missing ${extension} installer for ${arch}" >&2
-                exit 1
-              fi
-              cp "${source_file}" "release/publish/LClip-linux-${arch}.${extension}"
-            done
-          done
-          cp assets/io.lclip.LClip.svg release/publish/LClip.svg
-          cp scripts/install-release.sh release/publish/install-lclip.sh
-          cp scripts/uninstall-user.sh release/publish/uninstall-lclip.sh
-          chmod 0755 release/publish/install-lclip.sh release/publish/uninstall-lclip.sh
-          (cd release/publish && sha256sum LClip-* install-lclip.sh uninstall-lclip.sh > SHA256SUMS)
+        run: bash scripts/prepare-release-assets.sh
 
       - name: Attest release artifacts
         uses: actions/attest@v4
@@ -133,17 +115,25 @@ jobs:
           subject-path: release/publish/*
 
       - name: Publish tagged GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/publish/*
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          body: |
-            Stable LClip installers for Linux x86-64 and ARM64.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat >release/release-notes.md <<'EOF'
+          Stable LClip installers for Linux x86-64 and ARM64.
 
-            The no-root `install-lclip.sh` path uses the portable archive and does not require Node.js, npm, or FUSE. AppImage, Debian, RPM, and tar.gz files are also available for manual installation.
+          The no-root `install-lclip.sh` path uses the portable archive and does not require Node.js, npm, or FUSE. AppImage, Debian, RPM, and tar.gz files are also available for manual installation.
 
-            Verify downloads against `SHA256SUMS`. Both architectures are built natively and the packaged runtime is launched under Xvfb before publication. Desktop-specific shortcut and automatic-paste behavior still follows the support policy in `docs/linux-smoke-test.md`.
+          Verify downloads against `SHA256SUMS`. Both architectures are built natively and the packaged runtime is launched under Xvfb before publication. Desktop-specific shortcut and automatic-paste behavior still follows the support policy in `docs/linux-smoke-test.md`.
+          EOF
+          release_flags=(--verify-tag --generate-notes --notes-file release/release-notes.md)
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            release_flags+=(--prerelease)
+          else
+            release_flags+=(--latest)
+          fi
+          gh release create "$GITHUB_REF_NAME" release/publish/* "${release_flags[@]}"
 
   verify-published:
     if: startsWith(github.ref, 'refs/tags/v')

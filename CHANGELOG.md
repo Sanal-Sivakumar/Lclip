@@ -2,6 +2,15 @@
 
 All notable LClip changes are documented here. The project follows semantic versioning and publishes immutable tagged releases.
 
+## [1.0.1] - 2026-07-23
+
+### Fixed
+
+- Include `LClip.svg` in `SHA256SUMS`, allowing the checksum-enforcing no-root installer to complete successfully.
+- Make missing archive and icon checksum entries produce explicit installer errors.
+- Require native post-publication jobs to download, install, launch, and uninstall the public x86-64 and ARM64 portable releases.
+- Publish releases through the GitHub CLI so the stable pipeline has no deprecated Node.js action warning.
+
 ## [1.0.0] - 2026-07-23
 
 ### Added

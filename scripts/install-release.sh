@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="${LCLIP_REPOSITORY:-Sanal-Sivakumar/Lclip}"
-RELEASE_VERSION="${LCLIP_VERSION:-1.0.0}"
+RELEASE_VERSION="${LCLIP_VERSION:-1.0.1}"
 PREFIX="${LCLIP_PREFIX:-$HOME/.local}"
 ENABLE_AUTOSTART=1
 
@@ -13,7 +13,7 @@ Install the official LClip portable Linux release for the current user.
 Usage: ./install-lclip.sh [options]
 
 Options:
-  --release VERSION  Install a specific release (default: 1.0.0)
+  --release VERSION  Install a specific release (default: 1.0.1)
   --prefix PATH      Install below PATH (default: ~/.local)
   --no-autostart     Do not start LClip automatically after graphical login
   --help             Show this help
@@ -144,8 +144,14 @@ download "$RELEASE_BASE/$ARCHIVE_NAME" "$WORK_DIR/$ARCHIVE_NAME"
 download "$RELEASE_BASE/$ICON_NAME" "$WORK_DIR/$ICON_NAME"
 download "$RELEASE_BASE/SHA256SUMS" "$WORK_DIR/SHA256SUMS"
 
-grep -E "^[0-9a-fA-F]{64}  ${ARCHIVE_NAME//./\.}$" "$WORK_DIR/SHA256SUMS" >"$WORK_DIR/selected-checksums"
-grep -E "^[0-9a-fA-F]{64}  ${ICON_NAME//./\.}$" "$WORK_DIR/SHA256SUMS" >>"$WORK_DIR/selected-checksums"
+if ! grep -E "^[0-9a-fA-F]{64}  ${ARCHIVE_NAME//./\.}$" "$WORK_DIR/SHA256SUMS" >"$WORK_DIR/selected-checksums"; then
+  echo "The release checksum manifest has no entry for $ARCHIVE_NAME." >&2
+  exit 1
+fi
+if ! grep -E "^[0-9a-fA-F]{64}  ${ICON_NAME//./\.}$" "$WORK_DIR/SHA256SUMS" >>"$WORK_DIR/selected-checksums"; then
+  echo "The release checksum manifest has no entry for $ICON_NAME." >&2
+  exit 1
+fi
 [[ "$(wc -l <"$WORK_DIR/selected-checksums" | tr -d ' ')" == "2" ]] || { echo "The release checksum manifest is incomplete." >&2; exit 1; }
 (cd "$WORK_DIR" && sha256sum --check selected-checksums)
 

@@ -10,6 +10,7 @@ const changelog = await readFile(new URL("../CHANGELOG.md", import.meta.url), "u
 const smokeChecklist = await readFile(new URL("../docs/linux-smoke-test.md", import.meta.url), "utf8");
 const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
 const releaseWorkflow = await readFile(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+const releaseAssembly = await readFile(new URL("./prepare-release-assets.sh", import.meta.url), "utf8");
 const expectedTag = `v${packageJson.version}`;
 const actualTag = process.env.GITHUB_REF_TYPE === "tag"
   ? process.env.GITHUB_REF_NAME
@@ -42,9 +43,10 @@ const stableContractChecks = [
   [packageJson.desktopName === "io.lclip.LClip.desktop", "Electron desktop window identity"],
   [packageJson.build?.linux?.syncDesktopName === true, "synchronized Linux desktop filename"],
   [releaseWorkflow.includes("runner: ubuntu-24.04-arm"), "native ARM64 release runner"],
-  [releaseWorkflow.includes("for extension in AppImage deb rpm tar.gz"), "complete Linux release format set"],
+  [["AppImage", "deb", "rpm", "tar.gz"].every((format) => releaseAssembly.includes(format)), "complete Linux release format set"],
   [releaseWorkflow.includes("smoke-packaged-linux.sh"), "packaged runtime smoke test"],
   [releaseWorkflow.includes("SHA256SUMS"), "release checksums"],
+  [releaseWorkflow.includes("prepare-release-assets.sh"), "tested release asset assembly"],
   [releaseWorkflow.includes("uses: actions/attest@v4"), "release provenance attestations"],
   [releaseWorkflow.includes("verify-published:"), "public installer verification job"],
   [releaseWorkflow.includes("./install-lclip.sh --release"), "public no-root install exercise"],

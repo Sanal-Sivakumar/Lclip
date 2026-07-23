@@ -21,8 +21,8 @@ npm run verify
 npm audit --audit-level=high
 npm run verify:release
 git push origin main
-git tag -a v1.0.0 -m "LClip 1.0.0"
-git push origin v1.0.0
+git tag -a v1.0.1 -m "LClip 1.0.1"
+git push origin v1.0.1
 ```
 
 ## Stable support boundary

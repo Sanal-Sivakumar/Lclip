@@ -138,7 +138,7 @@ This section distinguishes solved design problems from environment-dependent lim
 **Solution:** Open the [latest release](https://github.com/Sanal-Sivakumar/Lclip/releases/latest) and confirm that `install-lclip.sh`, both architecture-specific tar.gz files, and `SHA256SUMS` are present. Do not bypass a missing checksum by extracting an unrelated file. To install a specific existing version:
 
 ```bash
-./install-lclip.sh --release 1.0.0
+./install-lclip.sh --release 1.0.1
 ```
 
 ### `The release checksum manifest is incomplete` or checksum verification fails

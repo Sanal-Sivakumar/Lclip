@@ -27,7 +27,7 @@ LClip 1.0 meets the repository's stable-release contract: the supported core has
 
 ## Public release evidence
 
-The authoritative build evidence is the `Verify LClip` workflow for the stable `main` commit and the `Release LClip` workflow for `v1.0.0`. Release assets and checksums must be inspected after those workflows complete; workflow URLs belong in the GitHub release and can also be recorded here without changing the immutable tag.
+The authoritative build evidence is the `Verify LClip` workflow for the stable `main` commit and the `Release LClip` workflow for `v1.0.1`. Release assets and checksums must be inspected after those workflows complete; workflow URLs belong in the GitHub release and can also be recorded here without changing the immutable tag. The post-publication gate introduced during 1.0 qualification caught the missing icon checksum in `v1.0.0`; that release is retained as superseded evidence rather than silently replacing its assets.
 
 ## Supported boundaries
 

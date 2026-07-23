@@ -485,9 +485,9 @@ CI runs syntax, state, IPC, network-boundary, desktop-status, release-contract, 
 npm run verify
 npm audit --audit-level=high
 npm run verify:release
-git tag -a v1.0.0 -m "LClip 1.0.0"
+git tag -a v1.0.1 -m "LClip 1.0.1"
 git push origin main
-git push origin v1.0.0
+git push origin v1.0.1
 ```
 
 Tags are immutable publication boundaries: do not replace artifacts on an existing tag. Stable publication requires the complete automated distribution contract, native builds, packaged-runtime residency checks, checksums, and attestations. Real compositor checks remain ongoing compatibility evidence rather than fabricated pass claims; automatic paste always retains a copy-only fallback. Follow [RELEASE.md](RELEASE.md) for the exact gate.
