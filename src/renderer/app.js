@@ -375,7 +375,6 @@ function openSettings() {
   $("#captureSetting").checked = state.data.settings.captureEnabled;
   $("#giphyKey").value = state.data.settings.giphyApiKey || "";
   $("#gifRating").value = state.data.settings.gifRating || "pg";
-  renderIntegrationStatus();
   const sheet = $("#settingsSheet");
   sheet.hidden = false;
   sheet.setAttribute("aria-hidden", "false");
@@ -387,31 +386,6 @@ function openSettings() {
   $(".mode-rail").setAttribute("aria-hidden", "true");
   $("#sheetScrim").classList.add("show");
   $("#settingsClose").focus();
-}
-
-function renderIntegrationStatus() {
-  const container = $("#integrationCard");
-  const status = state.data.status;
-  const shortcut = status.shortcutStatus || {};
-  const rows = [
-    ["Electron shortcut", shortcut.electron?.label || (status.shortcut ? "Registered" : "Unavailable"), shortcut.electron?.registered ? "ready" : "limited"],
-    ["Wayland portal", shortcut.portal?.label || "Status unavailable", shortcut.portal?.active ? "ready" : "neutral"],
-    ["GNOME native", shortcut.gnome?.label || "Status unavailable", shortcut.gnome?.configured ? "ready" : "neutral"],
-    ["Login startup", status.autostart?.label || "Status unavailable", status.autostart?.configured ? "ready" : "limited"],
-    ["Paste bridge", status.automaticPaste ? `${status.pasteBridge} · verified when used` : status.pasteBridge, status.automaticPaste ? "ready" : "limited"],
-    ["Local storage",
-      status.persistence?.state === "error" ? `Save failed · ${status.persistence.message}` : status.persistence?.state === "saving" ? "Saving changes locally" : "Changes are saved locally",
-      status.persistence?.state === "error" ? "error" : status.persistence?.state === "saving" ? "neutral" : "ready"]
-  ];
-  container.replaceChildren();
-  rows.forEach(([label, value, condition]) => {
-    const row = element("div", "integration-status");
-    row.dataset.state = condition;
-    row.append(element("strong", "", label), element("span", "", value));
-    container.append(row);
-  });
-  const detail = element("p", "integration-detail", `Window: ${status.windowBackend || "Native desktop"} · Build: ${status.buildRevision || "unknown"} · Session: ${status.session}${status.desktop ? ` · ${status.desktop}` : ""}`);
-  container.append(detail);
 }
 
 function closeSettings() {
@@ -507,7 +481,6 @@ api.onState(next => {
   const previousError = state.data?.status?.persistence?.state === "error" ? state.data.status.persistence.message : "";
   state.data = next;
   render();
-  if ($("#settingsSheet").classList.contains("open")) renderIntegrationStatus();
   const persistence = next?.status?.persistence;
   if (persistence?.state === "error" && persistence.message !== previousError) {
     toast("Local save failed. Your current session is still available; changes may be lost after restart.");
