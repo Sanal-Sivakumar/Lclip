@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -64,12 +64,31 @@ export class StateStore {
         giphyApiKey: typeof saved.giphyApiKey === "string" ? saved.giphyApiKey.trim().slice(0, 180) : "",
         gifRating: ["g", "pg", "pg-13"].includes(saved.gifRating) ? saved.gifRating : "pg"
       };
-    } catch {}
+      await chmod(dirname(this.path), 0o700);
+      await chmod(this.path, 0o600);
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        const detail = error instanceof SyntaxError
+          ? "state.json is not valid JSON"
+          : String(error?.message || "unknown storage error");
+        this.persistenceStatus = {
+          state: "error",
+          message: `Could not load local data: ${detail}`.slice(0, 220),
+          lastSavedAt: null
+        };
+        this.#emitPersistenceStatus();
+      }
+    }
     return this.snapshot();
   }
 
   snapshot() {
     return structuredClone(this.state);
+  }
+
+  restore(snapshot) {
+    this.state = structuredClone(snapshot);
+    return this.snapshot();
   }
 
   persistenceSnapshot() {
@@ -86,13 +105,19 @@ export class StateStore {
 
   #queuePersist(snapshot) {
     this.pendingWrites += 1;
+    this.persistenceStatus = {
+      state: "saving",
+      message: "Saving changes locally",
+      lastSavedAt: this.persistenceStatus.lastSavedAt
+    };
+    this.#emitPersistenceStatus();
     const write = this.writeQueue
       .then(() => this.persist(snapshot))
       .then(() => {
         this.pendingWrites -= 1;
         this.persistenceStatus = {
-          state: "saved",
-          message: "Changes are saved locally",
+          state: this.pendingWrites ? "saving" : "saved",
+          message: this.pendingWrites ? "Saving changes locally" : "Changes are saved locally",
           lastSavedAt: Date.now()
         };
         this.#emitPersistenceStatus();
@@ -136,10 +161,17 @@ export class StateStore {
   }
 
   async persist(snapshot = this.snapshot()) {
-    await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
+    const directory = dirname(this.path);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    await chmod(directory, 0o700);
     const temporary = `${this.path}.tmp`;
-    await writeFile(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporary, this.path);
-    await chmod(this.path, 0o600).catch(() => {});
+    try {
+      await writeFile(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
+      await rename(temporary, this.path);
+      await chmod(this.path, 0o600);
+    } catch (error) {
+      await rm(temporary, { force: true }).catch(() => {});
+      throw error;
+    }
   }
 }

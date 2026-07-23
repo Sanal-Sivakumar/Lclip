@@ -39,17 +39,19 @@ if [[ "$SKIP_BRIDGE" -eq 1 && "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
   echo "--configure-ydotool and --skip-input-bridge cannot be used together." >&2
   exit 1
 fi
-if [[ "$CONFIGURE_YDOTOOL" -eq 1 && "${EUID}" -eq 0 ]]; then
-  echo "Run this installer as the desktop user without sudo; it will request sudo when needed." >&2
+if [[ "${EUID}" -eq 0 ]]; then
+  echo "Run this installer as the signed-in desktop user without sudo; it will request sudo only for system files." >&2
   exit 1
 fi
 
-if [[ "${EUID}" -eq 0 ]]; then
-  SUDO=()
-else
-  command -v sudo >/dev/null || { echo "sudo is required for a system-wide install." >&2; exit 1; }
-  SUDO=(sudo)
-fi
+command -v sudo >/dev/null || { echo "sudo is required for a system-wide install." >&2; exit 1; }
+SUDO=(sudo)
+
+WORK_DIR="$(mktemp -d)"
+cleanup_work_dir() {
+  rm -rf "$WORK_DIR" 2>/dev/null || "${SUDO[@]}" rm -rf "$WORK_DIR"
+}
+trap cleanup_work_dir EXIT
 
 echo "Building LClip…"
 cd "$PROJECT_DIR"
@@ -83,7 +85,7 @@ stop_running_lclip() {
 
 SOURCE_REVISION="$(git -C "$PROJECT_DIR" rev-parse --short=12 HEAD 2>/dev/null || true)"
 if [[ -z "$SOURCE_REVISION" ]]; then SOURCE_REVISION="v$(node -p 'require("./package.json").version')"; fi
-BUILD_MARKER="$(mktemp)"
+BUILD_MARKER="$WORK_DIR/LCLIP_BUILD"
 printf '%s\n' "$SOURCE_REVISION" >"$BUILD_MARKER"
 
 INSTALL_PATH="/opt/lclip"
@@ -91,15 +93,98 @@ STAGED_PATH="/opt/lclip.new"
 ROLLBACK_PATH="/opt/lclip.rollback"
 HAD_PREVIOUS_INSTALL=0
 ROLLBACK_ACTIVE=0
+NEW_BUNDLE_ACTIVATED=0
+PREVIOUS_WAS_RUNNING=0
+INTEGRATION_BACKUP="$WORK_DIR/integration"
+mkdir -p "$INTEGRATION_BACKUP"
+SYSTEM_INTEGRATIONS=(
+  "/usr/local/bin/lclip:launcher"
+  "/usr/share/applications/io.lclip.LClip.desktop:desktop"
+  "/usr/share/icons/hicolor/scalable/apps/io.lclip.LClip.svg:icon"
+  "/etc/xdg/autostart/io.lclip.LClip.desktop:autostart"
+  "/etc/udev/rules.d/80-lclip-uinput.rules:udev-rule"
+  "/etc/modules-load.d/lclip-uinput.conf:modules-load"
+)
+LOGIN_USER="${SUDO_USER:-${USER:-}}"
+GROUP_EXISTED=0
+USER_HAD_GROUP=0
+USER_SERVICE_WAS_PRESENT=0
+USER_SERVICE_WAS_ENABLED=0
+USER_SERVICE_WAS_ACTIVE=0
+USER_SERVICE_PATH="$HOME/.config/systemd/user/lclip-ydotoold.service"
+
+backup_system_integrations() {
+  local entry path key
+  for entry in "${SYSTEM_INTEGRATIONS[@]}"; do
+    path="${entry%%:*}"
+    key="${entry##*:}"
+    if "${SUDO[@]}" test -e "$path"; then
+      "${SUDO[@]}" cp -a "$path" "$INTEGRATION_BACKUP/$key"
+    else
+      : >"$INTEGRATION_BACKUP/$key.absent"
+    fi
+  done
+  if [[ -e "$USER_SERVICE_PATH" ]]; then
+    cp -a "$USER_SERVICE_PATH" "$INTEGRATION_BACKUP/user-service"
+    USER_SERVICE_WAS_PRESENT=1
+  fi
+  if command -v systemctl >/dev/null; then
+    systemctl --user is-enabled lclip-ydotoold.service >/dev/null 2>&1 && USER_SERVICE_WAS_ENABLED=1 || true
+    systemctl --user is-active lclip-ydotoold.service >/dev/null 2>&1 && USER_SERVICE_WAS_ACTIVE=1 || true
+  fi
+  if getent group lclip-uinput >/dev/null 2>&1; then GROUP_EXISTED=1; fi
+  if [[ -n "$LOGIN_USER" ]] && id -nG "$LOGIN_USER" 2>/dev/null | tr ' ' '\n' | grep -qx 'lclip-uinput'; then USER_HAD_GROUP=1; fi
+}
+
+restore_system_integrations() {
+  local entry path key
+  for entry in "${SYSTEM_INTEGRATIONS[@]}"; do
+    path="${entry%%:*}"
+    key="${entry##*:}"
+    if [[ -e "$INTEGRATION_BACKUP/$key" ]]; then
+      "${SUDO[@]}" cp -a "$INTEGRATION_BACKUP/$key" "$path"
+    elif [[ -e "$INTEGRATION_BACKUP/$key.absent" ]]; then
+      "${SUDO[@]}" rm -f "$path"
+    fi
+  done
+  if [[ "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
+    systemctl --user disable --now lclip-ydotoold.service >/dev/null 2>&1 || true
+    if [[ "$USER_SERVICE_WAS_PRESENT" -eq 1 ]]; then
+      install -d -m 0700 "$(dirname "$USER_SERVICE_PATH")"
+      cp -a "$INTEGRATION_BACKUP/user-service" "$USER_SERVICE_PATH"
+    else
+      rm -f "$USER_SERVICE_PATH"
+    fi
+    if command -v systemctl >/dev/null; then
+      systemctl --user daemon-reload >/dev/null 2>&1 || true
+      [[ "$USER_SERVICE_WAS_ENABLED" -eq 1 ]] && systemctl --user enable lclip-ydotoold.service >/dev/null 2>&1 || true
+      [[ "$USER_SERVICE_WAS_ACTIVE" -eq 1 ]] && systemctl --user start lclip-ydotoold.service >/dev/null 2>&1 || true
+    fi
+    if [[ "$USER_HAD_GROUP" -eq 0 && -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]] && getent group lclip-uinput >/dev/null 2>&1; then
+      "${SUDO[@]}" gpasswd -d "$LOGIN_USER" lclip-uinput >/dev/null 2>&1 || true
+    fi
+    if [[ "$GROUP_EXISTED" -eq 0 ]] && getent group lclip-uinput >/dev/null 2>&1 && [[ -z "$(getent group lclip-uinput | cut -d: -f4)" ]]; then
+      "${SUDO[@]}" groupdel lclip-uinput >/dev/null 2>&1 || true
+    fi
+    command -v udevadm >/dev/null && "${SUDO[@]}" udevadm control --reload-rules >/dev/null 2>&1 || true
+  fi
+}
 
 rollback_install() {
   local status="${1:-$?}"
   trap - ERR
+  set +e
   if [[ "$ROLLBACK_ACTIVE" -eq 1 ]]; then
     echo "Installation failed; restoring the previous LClip bundle…" >&2
-    "${SUDO[@]}" rm -rf "$INSTALL_PATH"
+    restore_system_integrations
+    if [[ "$NEW_BUNDLE_ACTIVATED" -eq 1 ]]; then
+      "${SUDO[@]}" rm -rf "$INSTALL_PATH"
+    fi
     if [[ "$HAD_PREVIOUS_INSTALL" -eq 1 && -d "$ROLLBACK_PATH" ]]; then
       "${SUDO[@]}" mv "$ROLLBACK_PATH" "$INSTALL_PATH"
+    fi
+    if [[ "$PREVIOUS_WAS_RUNNING" -eq 1 && -x /usr/local/bin/lclip && "${EUID}" -ne 0 && ( -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ) ]]; then
+      nohup /usr/local/bin/lclip --hidden >"${TMPDIR:-/tmp}/lclip-rollback-startup.log" 2>&1 &
     fi
   fi
   "${SUDO[@]}" rm -rf "$STAGED_PATH"
@@ -115,26 +200,10 @@ if [[ -f "$STAGED_PATH/chrome-sandbox" ]]; then
   "${SUDO[@]}" chmod 4755 "$STAGED_PATH/chrome-sandbox"
 fi
 "${SUDO[@]}" install -m 0644 "$BUILD_MARKER" "$STAGED_PATH/resources/LCLIP_BUILD"
-rm -f "$BUILD_MARKER"
 
-stop_running_lclip
-
-if [[ -d "$INSTALL_PATH" ]]; then
-  "${SUDO[@]}" mv "$INSTALL_PATH" "$ROLLBACK_PATH"
-  HAD_PREVIOUS_INSTALL=1
-fi
-if ! "${SUDO[@]}" mv "$STAGED_PATH" "$INSTALL_PATH"; then
-  if [[ "$HAD_PREVIOUS_INSTALL" -eq 1 ]]; then "${SUDO[@]}" mv "$ROLLBACK_PATH" "$INSTALL_PATH"; fi
-  echo "The staged LClip bundle could not be activated; the previous installation was restored." >&2
-  exit 1
-fi
-ROLLBACK_ACTIVE=1
-trap rollback_install ERR
-
-LAUNCHER="$(mktemp)"
-DESKTOP="$(mktemp)"
-AUTOSTART="$(mktemp)"
-trap 'rm -f "$LAUNCHER" "$DESKTOP" "$AUTOSTART"' EXIT
+LAUNCHER="$WORK_DIR/lclip-launcher"
+DESKTOP="$WORK_DIR/io.lclip.LClip.desktop"
+AUTOSTART="$WORK_DIR/io.lclip.LClip.autostart.desktop"
 
 cat >"$LAUNCHER" <<'EOF'
 #!/bin/sh
@@ -174,15 +243,25 @@ X-KDE-autostart-after=panel
 OnlyShowIn=GNOME;KDE;XFCE;X-Cinnamon;MATE;LXQt;Unity;
 EOF
 
+backup_system_integrations
+
+if pgrep -f '^/opt/lclip/lclip( |$)' >/dev/null 2>&1; then PREVIOUS_WAS_RUNNING=1; fi
+ROLLBACK_ACTIVE=1
+trap rollback_install ERR
+
+stop_running_lclip
+
+if [[ -d "$INSTALL_PATH" ]]; then
+  "${SUDO[@]}" mv "$INSTALL_PATH" "$ROLLBACK_PATH"
+  HAD_PREVIOUS_INSTALL=1
+fi
+"${SUDO[@]}" mv "$STAGED_PATH" "$INSTALL_PATH"
+NEW_BUNDLE_ACTIVATED=1
+
 "${SUDO[@]}" install -m 0755 "$LAUNCHER" /usr/local/bin/lclip
 "${SUDO[@]}" install -m 0644 "$DESKTOP" /usr/share/applications/io.lclip.LClip.desktop
 "${SUDO[@]}" install -m 0644 "$AUTOSTART" /etc/xdg/autostart/io.lclip.LClip.desktop
 "${SUDO[@]}" install -m 0644 "$PROJECT_DIR/assets/io.lclip.LClip.svg" /usr/share/icons/hicolor/scalable/apps/io.lclip.LClip.svg
-
-DESKTOP_NAME="${XDG_CURRENT_DESKTOP:-}"
-if [[ "${EUID}" -ne 0 && "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null; then
-  node "$PROJECT_DIR/scripts/configure-gnome-shortcut.mjs" || echo "GNOME shortcut setup failed; add /usr/local/bin/lclip --show in Keyboard Settings." >&2
-fi
 
 install_bridge_package() {
   local package="$1"
@@ -220,18 +299,16 @@ if [[ "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
   command -v ydotool >/dev/null || { echo "ydotool could not be installed from this distribution's repositories." >&2; rollback_install 1; }
   command -v ydotoold >/dev/null || install_bridge_package ydotoold || true
   command -v ydotoold >/dev/null || { echo "The ydotoold daemon could not be installed. Automatic ydotool paste is unavailable." >&2; rollback_install 1; }
-  LOGIN_USER="${SUDO_USER:-${USER:-}}"
   [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]] || { echo "Run this installer as the desktop user, not with sudo, to configure ydotool." >&2; rollback_install 1; }
 
   echo "Configuring restricted /dev/uinput access for $LOGIN_USER…"
   "${SUDO[@]}" groupadd --system --force lclip-uinput
   "${SUDO[@]}" usermod -aG lclip-uinput "$LOGIN_USER"
-  UINPUT_RULE="$(mktemp)"
+  UINPUT_RULE="$WORK_DIR/80-lclip-uinput.rules"
   cat >"$UINPUT_RULE" <<'EOF'
 KERNEL=="uinput", GROUP="lclip-uinput", MODE="0660", OPTIONS+="static_node=uinput"
 EOF
   "${SUDO[@]}" install -m 0644 "$UINPUT_RULE" /etc/udev/rules.d/80-lclip-uinput.rules
-  rm -f "$UINPUT_RULE"
   printf 'uinput\n' | "${SUDO[@]}" tee /etc/modules-load.d/lclip-uinput.conf >/dev/null
   "${SUDO[@]}" modprobe uinput || true
   if command -v udevadm >/dev/null; then
@@ -242,7 +319,7 @@ EOF
   YDOTOOLD_PATH="$(command -v ydotoold)"
   USER_SERVICE_DIR="$HOME/.config/systemd/user"
   install -d -m 0700 "$USER_SERVICE_DIR"
-  YDOTOOL_SERVICE="$(mktemp)"
+  YDOTOOL_SERVICE="$WORK_DIR/lclip-ydotoold.service"
   cat >"$YDOTOOL_SERVICE" <<EOF
 [Unit]
 Description=LClip ydotool input daemon
@@ -259,11 +336,12 @@ RestartSec=2
 WantedBy=default.target
 EOF
   install -m 0644 "$YDOTOOL_SERVICE" "$USER_SERVICE_DIR/lclip-ydotoold.service"
-  rm -f "$YDOTOOL_SERVICE"
   if command -v systemctl >/dev/null; then
-    systemctl --user daemon-reload || true
-    systemctl --user enable lclip-ydotoold.service || true
-    systemctl --user start lclip-ydotoold.service || true
+    systemctl --user daemon-reload
+    systemctl --user enable lclip-ydotoold.service
+    systemctl --user start lclip-ydotoold.service || echo "ydotoold could not start before relogin; retry it after the new group membership is active." >&2
+  else
+    echo "systemd user services are unavailable; start $YDOTOOLD_PATH in the graphical session before using automatic paste." >&2
   fi
   NEEDS_RELOGIN=1
 fi
@@ -271,9 +349,14 @@ fi
 command -v update-desktop-database >/dev/null && "${SUDO[@]}" update-desktop-database /usr/share/applications || true
 command -v gtk-update-icon-cache >/dev/null && "${SUDO[@]}" gtk-update-icon-cache -f /usr/share/icons/hicolor || true
 
+DESKTOP_NAME="${XDG_CURRENT_DESKTOP:-}"
+if [[ "${EUID}" -ne 0 && "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null; then
+  node "$PROJECT_DIR/scripts/configure-gnome-shortcut.mjs" || echo "GNOME shortcut setup failed; add /usr/local/bin/lclip --show in Keyboard Settings." >&2
+fi
+
 ROLLBACK_ACTIVE=0
 trap - ERR
-"${SUDO[@]}" rm -rf "$ROLLBACK_PATH"
+"${SUDO[@]}" rm -rf "$ROLLBACK_PATH" || echo "The previous rollback bundle could not be removed from $ROLLBACK_PATH." >&2
 
 echo
 echo "LClip is installed."

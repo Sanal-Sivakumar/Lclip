@@ -2,7 +2,7 @@
   <img src="assets/io.lclip.LClip.svg" width="112" height="112" alt="LClip application icon">
   <h1>LClip</h1>
   <p><strong>Your clipboard, expressions, and reactions — one shortcut away.</strong></p>
-  <p>A private, system-integrated clipboard history and expression picker for Linux.</p>
+  <p>A local-first, system-integrated clipboard history and expression picker for Linux.</p>
   <p>
     <a href="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml"><img src="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml/badge.svg" alt="Verify LClip status"></a>
     <img src="https://img.shields.io/badge/release-1.0.0--beta.1-c1e8f8?style=flat-square" alt="Current source version 1.0.0 beta 1">
@@ -17,7 +17,7 @@
 
 ---
 
-LClip stays ready after graphical login. Press `Super + .` from any application to open a compact, dark layered-glass picker containing the last 10 copied text items, 244 offline emoji, 60 kaomoji, optional GIF search, and 124 useful symbols.
+After its per-user login setting has been enabled, LClip can stay ready after graphical login. Press `Super + .` from any application to open a compact, dark layered-glass picker containing the last 10 copied text items, 244 offline emoji, 60 kaomoji, optional GIF search, and 124 useful symbols.
 
 > [!IMPORTANT]
 > LClip never replaces normal `Ctrl+C` or `Ctrl+V`. It registers only `Super + .`; it is not a keylogger and does not receive unrelated keystrokes.
@@ -140,6 +140,22 @@ Verify a downloaded file from the directory containing it:
 sha256sum --check SHA256SUMS --ignore-missing
 ```
 
+Run an AppImage without a system install:
+
+```bash
+chmod +x LClip-linux-x64.AppImage
+./LClip-linux-x64.AppImage --show
+```
+
+Install a distribution package with the normal package manager:
+
+```bash
+sudo apt install ./LClip-linux-x64.deb
+# or: sudo dnf install ./LClip-linux-x64.rpm
+```
+
+Tagged packages provide the app, menu entry, Electron shortcut path, and LClip's per-user login autostart. They do not silently grant `/dev/uinput` access or create GNOME's native custom shortcut. Use the guided installer below for the complete opt-in `ydotool` and GNOME setup, or configure those integrations manually and confirm their separate status rows in Settings.
+
 ## Install on Linux
 
 ### Before you begin
@@ -204,15 +220,15 @@ The installer performs the complete setup:
 3. Runs syntax checks and all automated tests.
 4. Deletes stale `dist/` output and builds a fresh Electron application bundle.
 5. Stops any resident older LClip process before replacing the installation.
-6. Detects whether the laptop uses x86-64 or ARM64, stages the matching bundle, and restores the previous `/opt/lclip` installation automatically if activation or system integration fails.
+6. Detects whether the laptop uses x86-64 or ARM64, stages the matching bundle, and restores the previous application plus backed-up launcher, menu, icon, autostart, and optional input-integration files if activation or required integration fails.
 7. Records the installed Git revision and starts the new resident process in the current graphical session.
 8. Creates the `lclip` terminal command and application-menu entry.
 9. Adds graphical-login autostart for supported desktop environments.
-10. Configures the native `Super + .` custom shortcut when installing from a GNOME session.
+10. Attempts to configure the native `Super + .` custom shortcut when installing from a GNOME session and reports a desktop-specific failure without hiding it.
 11. Attempts to install automatic-paste tools using `apt`, `dnf`, `pacman`, or `zypper`.
 12. With `--configure-ydotool`, installs both the `ydotool` client and separately packaged `ydotoold` daemon when required by the distribution.
 13. Creates a dedicated `lclip-uinput` group, installs a narrowly scoped udev rule for `/dev/uinput`, and adds the current desktop user to that group.
-14. Installs and enables `~/.config/systemd/user/lclip-ydotoold.service` when the distribution does not provide a usable user service.
+14. Installs and, on systemd desktops, enables `~/.config/systemd/user/lclip-ydotoold.service` when the distribution does not provide a usable user service.
 
 ### Connect and contribute
 
@@ -262,6 +278,7 @@ LClip will still copy selected values to the clipboard. Until a supported bridge
 | `/usr/share/applications/io.lclip.LClip.desktop` | Application-menu entry |
 | `/usr/share/icons/hicolor/scalable/apps/io.lclip.LClip.svg` | System application icon |
 | `/etc/xdg/autostart/io.lclip.LClip.desktop` | Starts LClip after graphical login |
+| `~/.config/autostart/io.lclip.LClip.desktop` | Per-user enabled/disabled login entry written by LClip; also supports tagged packages |
 | `/etc/udev/rules.d/80-lclip-uinput.rules` | Optional restricted `/dev/uinput` rule created by `--configure-ydotool` |
 | `/etc/modules-load.d/lclip-uinput.conf` | Ensures the `uinput` kernel module is available after boot |
 | `~/.config/systemd/user/lclip-ydotoold.service` | Per-user daemon service created by `--configure-ydotool` |
@@ -337,7 +354,7 @@ Useful controls:
 
 - **Pause capture** stops adding new clipboard text without deleting existing history.
 - **Clear** permanently removes the currently stored history entries.
-- **Start after login** controls the per-user override for system autostart.
+- **Start after login** writes an explicit per-user XDG autostart entry, so the setting works for both guided and tagged-package installations.
 - The tray icon can open LClip, pause or resume capture, and quit the process.
 
 ## GIF search
@@ -440,6 +457,8 @@ From a repository checkout, run:
 
 The uninstaller removes the application, launcher, menu entry, icon, system autostart file, and the current user's autostart override. It deliberately leaves the current user's LClip history and settings in place. The script prints the remaining location so it can be deleted manually if desired.
 
+For a tagged Debian or RPM package, disable **Start after login** before removing the package, use the distribution package manager, then remove only `~/.config/autostart/io.lclip.LClip.desktop` if that LClip-owned entry remains. Package managers cannot safely delete per-user files for every account.
+
 ## Further documentation
 
 | Document | Start here when you want to… |
@@ -450,6 +469,7 @@ The uninstaller removes the application, launcher, menu entry, icon, system auto
 | **[Design](DESIGN.md)** | Explore the visual system, interface decisions, colors, spacing, and interaction direction |
 | **[Release Process](RELEASE.md)** | Run the beta/stable gates, publish architecture-specific installers, and verify checksums |
 | **[Changelog](CHANGELOG.md)** | Review user-visible changes and the current validation boundary |
+| **[Production Readiness](PRODUCTION_READINESS.md)** | See verified controls, collected evidence, intentional boundaries, and stable-release blockers |
 | **[History Rewrite](docs/history-rewrite.md)** | Coordinate the one-time `.venv` cleanup without overwriting new remote work or reintroducing old objects |
 
 > New to Linux desktop terminology? Begin with **[LClip Technical Details](technical_details.md)**. If something is not working, go directly to **[LClip Troubleshooting](troubleshooting.md)**.

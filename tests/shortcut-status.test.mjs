@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { buildShortcutStatus, detectGnomeNativeShortcut } from "../src/main/shortcut-status.mjs";
 
 test("shortcut status distinguishes X11, Xwayland, portal, and GNOME native paths", () => {
-  const gnome = { supported: true, configured: true, label: "GNOME native shortcut active" };
+  const gnome = { supported: true, configured: true, label: "GNOME native shortcut configured" };
   const xwayland = buildShortcutStatus({ electronRegistered: false, platform: "linux", env: { XDG_SESSION_TYPE: "wayland" }, windowBackend: { useXwayland: true }, gnome });
   assert.equal(xwayland.active, true);
   assert.equal(xwayland.electron.route, "Electron through Xwayland");
@@ -22,7 +22,15 @@ test("GNOME native detection verifies the exact command and binding", async () =
     if (args.at(-1) === "command") return { stdout: "'/usr/local/bin/lclip --show'" };
     return { stdout: "'<Super>period'" };
   };
-  const result = await detectGnomeNativeShortcut({ platform: "linux", env: { XDG_CURRENT_DESKTOP: "GNOME" }, run });
+  const result = await detectGnomeNativeShortcut({ platform: "linux", env: { XDG_CURRENT_DESKTOP: "GNOME" }, run, accessFile: async () => {} });
   assert.equal(result.configured, true);
-  assert.equal(result.label, "GNOME native shortcut active");
+  assert.equal(result.label, "GNOME native shortcut configured");
+  const missing = await detectGnomeNativeShortcut({
+    platform: "linux",
+    env: { XDG_CURRENT_DESKTOP: "GNOME" },
+    run,
+    accessFile: async () => { throw new Error("missing"); }
+  });
+  assert.equal(missing.configured, false);
+  assert.equal(missing.label, "GNOME shortcut command is missing");
 });

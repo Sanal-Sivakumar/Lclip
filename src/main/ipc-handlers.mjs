@@ -1,5 +1,6 @@
 export function sanitizeSettings(settings) {
   return {
+    captureEnabled: Boolean(settings?.captureEnabled),
     autostartEnabled: Boolean(settings?.autostartEnabled),
     giphyApiKey: String(settings?.giphyApiKey || "").trim().slice(0, 180),
     gifRating: ["g", "pg", "pg-13"].includes(settings?.gifRating) ? settings.gifRating : "pg"
@@ -40,8 +41,26 @@ export function registerLclipIpc({
   });
   ipcMain.handle("lclip:save-settings", async (_event, settings) => {
     const allowed = sanitizeSettings(settings);
-    await setAutostart(allowed.autostartEnabled);
-    await store.updateAndPersist(state => { state.settings = { ...state.settings, ...allowed }; });
+    const previousState = store.snapshot();
+    const previous = previousState.settings;
+    const autostartChanged = allowed.autostartEnabled !== previous.autostartEnabled;
+    if (autostartChanged) await setAutostart(allowed.autostartEnabled);
+    try {
+      await store.updateAndPersist(state => { state.settings = { ...state.settings, ...allowed }; });
+    } catch (error) {
+      store.restore?.(previousState);
+      createTrayMenu();
+      broadcast();
+      if (autostartChanged) {
+        try {
+          await setAutostart(previous.autostartEnabled);
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError], "Could not save settings or restore the previous autostart state");
+        }
+      }
+      throw error;
+    }
+    createTrayMenu();
     broadcast();
     return publicState();
   });

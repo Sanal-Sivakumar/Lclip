@@ -1,12 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { access } from "node:fs/promises";
 
 const runFile = promisify(execFile);
 const ROOT_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys";
 const BINDING_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding";
 const BINDING_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/";
 
-export async function detectGnomeNativeShortcut({ platform = process.platform, env = process.env, run = runFile } = {}) {
+export async function detectGnomeNativeShortcut({ platform = process.platform, env = process.env, run = runFile, accessFile = access } = {}) {
   const supported = platform === "linux" && String(env.XDG_CURRENT_DESKTOP || "").toUpperCase().includes("GNOME");
   if (!supported) return { supported: false, configured: false, label: "Not a GNOME session" };
   try {
@@ -19,11 +20,19 @@ export async function detectGnomeNativeShortcut({ platform = process.platform, e
     ]);
     const commandValue = String(command.stdout || "").replaceAll("'", "").trim();
     const bindingValue = String(binding.stdout || "").replaceAll("'", "").trim();
-    const configured = commandValue === "/usr/local/bin/lclip --show" && bindingValue === "<Super>period";
+    const valuesMatch = commandValue === "/usr/local/bin/lclip --show" && bindingValue === "<Super>period";
+    let executableExists = false;
+    if (valuesMatch) {
+      try {
+        await accessFile("/usr/local/bin/lclip");
+        executableExists = true;
+      } catch {}
+    }
+    const configured = valuesMatch && executableExists;
     return {
       supported: true,
       configured,
-      label: configured ? "GNOME native shortcut active" : "GNOME shortcut differs from the LClip binding"
+      label: configured ? "GNOME native shortcut configured" : valuesMatch ? "GNOME shortcut command is missing" : "GNOME shortcut differs from the LClip binding"
     };
   } catch {
     return { supported: true, configured: false, label: "GNOME shortcut status unavailable" };

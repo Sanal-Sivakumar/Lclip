@@ -108,13 +108,13 @@ There are two different meanings of “system integration”:
 1. **System-wide installation** means files are installed in shared locations such as `/opt`, `/usr/local/bin`, and `/usr/share/applications`.
 2. **User-session execution** means the process runs as the signed-in user and can communicate with that user's desktop.
 
-LClip uses both. Its files are installed system-wide, but its process starts through `/etc/xdg/autostart` after graphical login. Starting it as a root daemon during boot would be technically wrong because there may be no graphical session yet, and root should not collect a user's copied secrets.
+LClip uses both. Its files may be installed system-wide, but its process starts as the logged-in user through XDG autostart after graphical login. Starting it as a root daemon during boot would be technically wrong because there may be no graphical session yet, and root should not collect a user's copied secrets.
 
 ### XDG autostart
 
 **XDG** refers to cross-desktop standards maintained under the freedesktop.org ecosystem. An XDG autostart `.desktop` file tells compatible desktops to launch an application after login.
 
-The installer creates:
+The guided installer creates a system fallback:
 
 ```text
 /etc/xdg/autostart/io.lclip.LClip.desktop
@@ -126,13 +126,13 @@ This system entry executes:
 /usr/local/bin/lclip --hidden
 ```
 
-Disabling autostart in LClip creates a user override at:
+LClip also writes an explicit per-user entry at:
 
 ```text
 ~/.config/autostart/io.lclip.LClip.desktop
 ```
 
-with `Hidden=true`. Enabling autostart removes that override, revealing the system entry again.
+Disabling autostart writes `Hidden=true`. Enabling it writes a complete launch entry using the current packaged executable or the original AppImage path. Because this is runtime-owned rather than dependent on the guided installer, tagged AppImage, Debian, and RPM builds can honor the same Settings control. The per-user file overrides the same-named system fallback without creating a duplicate launch.
 
 ### `.desktop` file
 
@@ -142,7 +142,7 @@ A `.desktop` file is a small text manifest describing a graphical application: i
 
 ### Electron
 
-**Electron** is a framework for desktop applications built with web technology. It combines Chromium, which renders HTML and CSS, with Node.js, which can access operating-system facilities. LClip uses Electron 43.1.1.
+**Electron** is a framework for desktop applications built with web technology. It combines Chromium, which renders HTML and CSS, with Node.js, which can access operating-system facilities. LClip uses Electron 43.2.0.
 
 Electron applications usually have multiple processes:
 
@@ -171,7 +171,7 @@ This separation prevents UI code from receiving unrestricted filesystem or proce
 
 ### Renderer process
 
-`src/renderer/index.html`, `styles.css`, `app.js`, and `catalog.js` create the interface. The catalog contains over 200 emoji, over 60 kaomoji, and over 100 symbols. The renderer filters these offline lists, responds to mouse and keyboard navigation, displays status, and asks the main process to perform privileged actions.
+`src/renderer/index.html`, `styles.css`, `app.js`, and `catalog.js` create the interface. The catalog contains 244 emoji, 60 kaomoji, and 124 symbols. The renderer filters these offline lists, responds to mouse and keyboard navigation, displays status, and asks the main process to perform privileged actions.
 
 The renderer cannot import Node.js modules because `nodeIntegration` is disabled.
 
@@ -191,7 +191,7 @@ External Settings links follow the same narrow-boundary design. Electron denies 
 
 The picker is a 700x510 Electron `BrowserWindow` configured as frameless, transparent, always on top, absent from the taskbar, visible on every workspace, and hidden when it loses focus. The visual “glass” comes from a mostly opaque tinted base, one translucent highlight layer, and compositor blur. The higher base opacity prevents detailed wallpaper from competing with text while still retaining environmental color. Actual appearance can differ with compositor support, GPU drivers, and accessibility settings.
 
-The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 28-pixel strip above Search uses Electron's native `app-region: drag` contract, allowing the desktop window manager to perform the move. The close button uses `app-region: no-drag`, so it remains interactive. This avoids fragile renderer pointer capture, cursor polling, and repeated JavaScript `setPosition` calls. After movement, later openings preserve the user-selected position instead of forcing the picker back to the center.
+The first show request is held until Electron emits `ready-to-show`, which avoids exposing a partially loaded window. LClip centers the picker once per running process. A clear 44-pixel strip above Search uses Electron's native `app-region: drag` contract, allowing the desktop window manager to perform the move. The close button uses `app-region: no-drag`, so it remains interactive. This avoids fragile renderer pointer capture, cursor polling, and repeated JavaScript `setPosition` calls. After movement, later openings preserve the user-selected position instead of forcing the picker back to the center.
 
 On Wayland sessions, both the installed launcher and the in-process backend selector choose `--ozone-platform=x11` whenever Xwayland's `DISPLAY` is available. Passing the switch in `/usr/local/bin/lclip` ensures the backend is selected before Electron initializes its window. The selector does not treat Electron's internally populated ozone hint as a user request for native Wayland. Only `LCLIP_NATIVE_WAYLAND=1` disables the automatic Xwayland choice. Native Wayland remains available for systems without Xwayland, but Electron's window-position restriction means drag cannot be guaranteed there.
 
@@ -244,8 +244,9 @@ The system installer records the checkout's 12-character Git revision in `/opt/l
 4. A duplicate is removed from its old position.
 5. The new entry is placed first.
 6. Entries beyond number 10 are discarded.
-7. A snapshot is atomically persisted to disk.
-8. The UI receives the new public state.
+7. A snapshot is queued for a temporary-file-plus-rename persistence write.
+8. The UI receives the new public state with a saving indicator.
+9. A later state broadcast reports either the confirmed save time or an observable storage error.
 
 ### Text activation flow
 
@@ -261,8 +262,8 @@ The system installer records the checkout's 12-character Git revision in `/opt/l
 ### GIF flow
 
 1. The user enters an optional GIPHY API key in Settings.
-2. The main process cancels any older in-flight search, then requests up to 24 search or trending results over HTTPS.
-3. The renderer displays GIPHY-hosted WebP previews.
+2. The main process cancels any older in-flight search, then requests up to 24 search or trending results over HTTPS through a stream capped at 2 MB.
+3. Preview and original URLs are revalidated against exact GIPHY host boundaries before the renderer displays GIPHY-hosted WebP previews.
 4. Selecting a result sends its metadata to the main process.
 5. The main process accepts only HTTPS hosts equal to `giphy.com` or ending in `.giphy.com`.
 6. It revalidates redirects and content type, then downloads through a bounded stream with a 12-second timeout. The reader is cancelled immediately when accumulated data exceeds 15 MB.
@@ -343,6 +344,8 @@ LClip first writes a temporary file and then renames it over `state.json`. Renam
 
 The directory is created with mode `0700`, meaning only the owner can enter or list it. The state file is written with mode `0600`, meaning only the owner can read or modify it. These modes protect against other ordinary user accounts, but not against malware already running as the same user or an administrator.
 
+Read, parse, permission, and write failures are exposed through the Settings storage row, an in-window toast, and a desktop notification. LClip keeps the current in-memory session usable rather than claiming that the failed change reached disk. Settings saves also restore the previous autostart file and in-memory settings when persistence fails, so operating-system behavior and the saved preference do not drift apart.
+
 ## 8. Security model
 
 ### Context isolation
@@ -409,7 +412,7 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 
 The installer rejects conflicting or unknown options. It must be invoked as the desktop user so `sudo` is used only for system file operations and the GNOME shortcut is written into the correct user's settings.
 
-Before packaging, the installer removes `dist/` so an old unpacked bundle cannot be selected accidentally. After verification and packaging, it prepares a complete root-owned bundle at `/opt/lclip.new`, records the build marker, and stops the resident process. The previous installation is moved to `/opt/lclip.rollback` before the staged bundle is activated. If activation or a required system-integration step fails, the error trap restores that previous bundle automatically. The rollback copy is removed only after the installation finishes successfully, then the new resident process starts in the current graphical session.
+Before packaging, the installer removes `dist/` so an old unpacked bundle cannot be selected accidentally. After verification and packaging, it prepares a complete root-owned bundle at `/opt/lclip.new`, records the build marker, and backs up the existing launcher, desktop entry, icon, autostart file, and optional input-integration files. The resident process is then stopped and the previous application is moved to `/opt/lclip.rollback` before the staged bundle is activated. If activation or a required system-integration step fails, the error trap restores the previous bundle, backed-up integration files, user service, and prior group membership, then restarts the old resident process when it had been running. Packages installed through the operating system's package manager are deliberately not removed by rollback. The bundle copy is removed only after installation succeeds, then the new resident process starts in the current graphical session.
 
 ## 10. Tests and verification
 
@@ -426,7 +429,7 @@ Before packaging, the installer removes `dist/` so an old unpacked bundle cannot
 - the offline emoji, kaomoji, and symbol catalogs meet their minimum sizes, contain searchable metadata, and do not duplicate values.
 - Wayland sessions choose Xwayland only when it is available and the user has not requested native Wayland.
 
-The current suite contains 23 automated tests covering state, persistence, IPC, GIPHY bounds and cancellation, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. These tests do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. The evidence-bearing Linux matrix in `docs/linux-smoke-test.md` remains required for stable-release confidence.
+The current suite contains 30 automated tests covering state, persistence, autostart, IPC, GIPHY bounds and cancellation, release-tag consistency, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. These tests do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. The evidence-bearing Linux matrix in `docs/linux-smoke-test.md` remains required for stable-release confidence.
 
 ## 11. License and copyleft
 

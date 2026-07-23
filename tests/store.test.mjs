@@ -55,3 +55,16 @@ test("persistence errors are observable and a later write clears them", async ()
   await store.flush();
   assert.equal(store.persistenceSnapshot().state, "saved");
 });
+
+test("malformed saved state is reported instead of silently ignored", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lclip-store-load-error-"));
+  const path = join(directory, "state.json");
+  await writeFile(path, "{not valid json", { mode: 0o600 });
+  const statuses = [];
+  const store = new StateStore(path, { onPersistenceStatus: status => statuses.push(status) });
+  const state = await store.load();
+  assert.deepEqual(state.history, []);
+  assert.equal(store.persistenceSnapshot().state, "error");
+  assert.match(store.persistenceSnapshot().message, /Could not load local data/);
+  assert.equal(statuses.at(-1).state, "error");
+});

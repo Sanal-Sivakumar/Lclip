@@ -34,7 +34,7 @@
         <div class="search-row">
           <div class="search-wrap">
             <span aria-hidden="true">⌕</span>
-            <input id="searchInput" type="search" role="combobox" aria-autocomplete="list" aria-controls="results" aria-expanded="true" autocomplete="off" spellcheck="false" placeholder="Search clipboard history" aria-label="Search LClip">
+            <input id="searchInput" type="search" role="combobox" aria-autocomplete="list" aria-controls="lclip-options" aria-expanded="true" autocomplete="off" spellcheck="false" placeholder="Search clipboard history" aria-label="Search LClip">
             <kbd>Super&nbsp;+&nbsp;.</kbd>
           </div>
         </div>
@@ -48,12 +48,13 @@
           </div>
           <div class="heading-actions" id="headingActions"></div>
         </div>
-        <div class="results" id="results" role="listbox" aria-label="Clipboard history results"></div>
+        <div class="results" id="results" role="region" aria-label="Clipboard history results"></div>
+        <div class="results-meta" id="resultsMeta"></div>
       </section>
 
     </main>
 
-    <aside class="settings-sheet" id="settingsSheet" aria-labelledby="settingsTitle" aria-hidden="true" inert hidden>
+    <aside class="settings-sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" aria-hidden="true" inert hidden>
       <header><div><h2 id="settingsTitle">LClip settings</h2><p>System behavior and optional services</p></div><button id="settingsClose" aria-label="Close settings">×</button></header>
       <div class="settings-content">
         <section>

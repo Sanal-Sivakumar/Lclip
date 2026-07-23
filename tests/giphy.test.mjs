@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { downloadGiphyAsset, readBodyWithLimit, validateGiphyUrl } from "../src/main/giphy.mjs";
+import { downloadGiphyAsset, normalizeGiphyResults, readBodyWithLimit, readGiphySearchResponse, validateGiphyUrl } from "../src/main/giphy.mjs";
 
 test("GIPHY URLs require HTTPS and an exact GIPHY host boundary", () => {
   assert.equal(validateGiphyUrl("https://media.giphy.com/media/demo/giphy.gif").hostname, "media.giphy.com");
@@ -55,4 +55,42 @@ test("download revalidates redirects and supports cancellation", async () => {
   });
   controller.abort(new Error("cancelled"));
   await assert.rejects(pending, /cancelled/);
+});
+
+test("search responses are stream-limited and discard untrusted image URLs", async () => {
+  const payload = {
+    data: [
+      {
+        id: "safe",
+        title: "Safe GIF",
+        images: {
+          fixed_width_small: { webp: "https://media.giphy.com/media/safe/preview.webp", width: "200", height: "120" },
+          original: { url: "https://media.giphy.com/media/safe/giphy.gif" }
+        }
+      },
+      {
+        id: "unsafe",
+        images: {
+          fixed_width_small: { webp: "https://example.com/preview.webp" },
+          original: { url: "https://media.giphy.com/media/safe/giphy.gif" }
+        }
+      }
+    ]
+  };
+  const response = new Response(JSON.stringify(payload), {
+    headers: { "content-type": "application/json" }
+  });
+  Object.defineProperty(response, "url", { value: "https://api.giphy.com/v1/gifs/search" });
+  const parsed = await readGiphySearchResponse(response, 10_000);
+  const results = normalizeGiphyResults(parsed);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].id, "safe");
+
+  const oversized = {
+    ok: true,
+    url: "https://api.giphy.com/v1/gifs/search",
+    headers: new Headers({ "content-length": "100", "content-type": "application/json" }),
+    body: { cancel: async () => {} }
+  };
+  await assert.rejects(readGiphySearchResponse(oversized, 10), /too large/);
 });

@@ -47,12 +47,12 @@ export async function detectPasteBridge(env = process.env, platform = process.pl
       id: "ydotool",
       command: ydotool,
       syntax,
-      label: syntax === "legacy-symbolic" ? "Automatic paste · ydotool 0.x" : "Automatic paste · ydotool",
+      label: syntax === "legacy-symbolic" ? "Paste bridge available · ydotool 0.x" : "Paste bridge available · ydotool",
       automatic: true
     });
   }
-  if (session === "wayland" && wtype) candidates.push({ id: "wtype", command: wtype, label: "Automatic paste · Wayland", automatic: true });
-  if (xdotool) candidates.push({ id: "xdotool", command: xdotool, label: session === "wayland" ? "Automatic paste · Xwayland" : "Automatic paste · X11", automatic: true });
+  if (session === "wayland" && wtype) candidates.push({ id: "wtype", command: wtype, label: "Paste bridge available · Wayland", automatic: true });
+  if (xdotool) candidates.push({ id: "xdotool", command: xdotool, label: session === "wayland" ? "Paste bridge available · Xwayland" : "Paste bridge available · X11", automatic: true });
   if (candidates.length) return { ...candidates[0], candidates };
   return { id: "unavailable", label: "Copy only · input bridge missing", automatic: false };
 }

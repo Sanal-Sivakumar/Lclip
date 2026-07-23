@@ -18,7 +18,7 @@ This document records the important development problems addressed in LClip and 
 | Lists would not scroll | Results depended on a calculated height inside a non-grid content area | Bounded Grid rows, `min-height: 0`, and independent vertical overflow for results and Settings |
 | Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
 | Project license was permissive MIT despite a permanent open-source goal | MIT permits proprietary redistribution | Replaced with full GNU GPLv3 text and consistent `GPL-3.0-only` project metadata |
-| New installation still displayed the removed footer and immovable window | `/opt/lclip` was replaced while the old Electron process continued running code already loaded in memory | Installer now stops the resident instance, clears stale build output, installs atomically, records the Git revision, and starts the new process |
+| New installation still displayed the removed footer and immovable window | `/opt/lclip` was replaced while the old Electron process continued running code already loaded in memory | Installer now stops the resident instance, clears stale build output, activates a staged bundle with rollback, records the Git revision, and starts the new process |
 
 ## 1. Quick diagnosis
 
@@ -70,7 +70,7 @@ This section distinguishes solved design problems from environment-dependent lim
 
 **Risk:** A root boot daemon starts before a user desktop exists, cannot reliably access that user's clipboard or focus, and would process sensitive clipboard data with unnecessary privilege.
 
-**Implemented solution:** Install application files system-wide under `/opt/lclip`, but start the process as the logged-in user through `/etc/xdg/autostart`. This provides OS-like availability without a privileged clipboard daemon.
+**Implemented solution:** Install application files system-wide under `/opt/lclip`, but start the process as the logged-in user through XDG autostart. The guided installer provides a system fallback and LClip writes the user's explicit enabled/disabled entry. This provides OS-like availability without a privileged clipboard daemon.
 
 ### Problem: Wayland deliberately restricts synthetic paste
 
@@ -138,7 +138,7 @@ This section distinguishes solved design problems from environment-dependent lim
 
 **Cause:** The current user is not root and `sudo` is unavailable.
 
-**Solution:** Install/configure `sudo`, use an administrator account, or run the installer as root from a trusted local checkout. Do not modify the script to silently install shared files without authorization.
+**Solution:** Install/configure `sudo` and run the installer as the signed-in desktop user. The script requests administrator authorization only for shared system files and rejects a root launch so per-user desktop integration is not written into the wrong account.
 
 ### `npm: command not found`, `npm WARN EBADENGINE`, or Node is too old
 
@@ -313,22 +313,17 @@ printf '%s\n' "$PATH"
 
 ### LClip does not start after login
 
-**Possible causes:** The system autostart file is missing, autostart is disabled by a per-user override, the desktop is not listed by the entry, or LClip crashes at startup.
+**Possible causes:** The per-user autostart file is missing or contains `Hidden=true`, the desktop is not listed by the entry, its `Exec` path moved (especially an AppImage), or LClip crashes at startup.
 
 **Checks:**
 
 ```bash
-cat /etc/xdg/autostart/io.lclip.LClip.desktop
 cat ~/.config/autostart/io.lclip.LClip.desktop 2>/dev/null || true
 pgrep -a lclip
 /usr/local/bin/lclip --show
 ```
 
-If the user override contains `Hidden=true`, enable “Start after login” in Settings or remove only that override:
-
-```bash
-rm ~/.config/autostart/io.lclip.LClip.desktop
-```
+If the user entry contains `Hidden=true`, enable “Start after login” in Settings so LClip rewrites a complete enabled entry. Deleting it can reveal the guided installer's system fallback and unintentionally re-enable startup.
 
 Then log out and back in. If the desktop is not listed in `OnlyShowIn`, manual startup may work but the installer needs an explicit compatibility update for that environment.
 

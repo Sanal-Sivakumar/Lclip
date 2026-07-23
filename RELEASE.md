@@ -45,4 +45,4 @@ The same release includes `SHA256SUMS`. GitHub's release workflow also creates p
 
 ## Rollback
 
-If an installer fails during an upgrade, `scripts/install-system.sh` restores the previous `/opt/lclip` bundle automatically. If a published beta is defective, leave its tag immutable, mark the GitHub release clearly, and publish a higher patch or prerelease version. Do not silently replace release assets under an existing tag.
+If an installer fails during an upgrade, `scripts/install-system.sh` restores the previous `/opt/lclip` bundle and backed-up system-integration files automatically; operating-system packages installed as dependencies are not removed. If a published beta is defective, leave its tag immutable, mark the GitHub release clearly, and publish a higher patch or prerelease version. Do not silently replace release assets under an existing tag.

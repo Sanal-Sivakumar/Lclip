@@ -13,9 +13,16 @@ function harness() {
   let trayRefreshes = 0;
   const autostart = [];
   const store = {
+    snapshot() {
+      return structuredClone(state);
+    },
     async updateAndPersist(mutator) {
       mutator(state);
       return structuredClone(state);
+    },
+    restore(snapshot) {
+      state.history = structuredClone(snapshot.history);
+      state.settings = structuredClone(snapshot.settings);
     }
   };
   registerLclipIpc({
@@ -34,8 +41,9 @@ function harness() {
 }
 
 test("settings IPC accepts only the documented settings contract", () => {
-  const sanitized = sanitizeSettings({ autostartEnabled: 1, giphyApiKey: `  ${"x".repeat(220)}  `, gifRating: "r", unexpected: "ignored" });
-  assert.deepEqual(Object.keys(sanitized), ["autostartEnabled", "giphyApiKey", "gifRating"]);
+  const sanitized = sanitizeSettings({ captureEnabled: 1, autostartEnabled: 1, giphyApiKey: `  ${"x".repeat(220)}  `, gifRating: "r", unexpected: "ignored" });
+  assert.deepEqual(Object.keys(sanitized), ["captureEnabled", "autostartEnabled", "giphyApiKey", "gifRating"]);
+  assert.equal(sanitized.captureEnabled, true);
   assert.equal(sanitized.autostartEnabled, true);
   assert.equal(sanitized.giphyApiKey.length, 180);
   assert.equal(sanitized.gifRating, "pg");
@@ -54,13 +62,47 @@ test("history and capture IPC wait for persistence before broadcasting", async (
 
 test("settings IPC applies autostart and returns persisted state", async () => {
   const app = harness();
-  const next = await app.handles.get("lclip:save-settings")({}, { autostartEnabled: false, giphyApiKey: " key ", gifRating: "pg-13" });
+  const next = await app.handles.get("lclip:save-settings")({}, { captureEnabled: true, autostartEnabled: false, giphyApiKey: " key ", gifRating: "pg-13" });
   assert.deepEqual(app.autostart, [false]);
   assert.equal(next.settings.giphyApiKey, "key");
   assert.equal(next.settings.gifRating, "pg-13");
+  assert.equal(app.trayRefreshes(), 1);
   assert.equal(app.broadcasts(), 1);
   assert.ok(app.events.has("lclip:cancel-gif-search"));
   assert.ok(app.events.has("lclip:hide"));
+});
+
+test("settings IPC restores autostart when persistence fails", async () => {
+  const app = harness();
+  const originalUpdate = app.state.settings.autostartEnabled;
+  const failingStore = {
+    snapshot: () => structuredClone(app.state),
+    restore: snapshot => {
+      app.state.history = structuredClone(snapshot.history);
+      app.state.settings = structuredClone(snapshot.settings);
+    },
+    updateAndPersist: async mutator => {
+      mutator(app.state);
+      throw new Error("disk full");
+    }
+  };
+  const handles = new Map();
+  const autostart = [];
+  registerLclipIpc({
+    ipcMain: { handle: (channel, callback) => handles.set(channel, callback), on: () => {} },
+    store: failingStore,
+    activateText: async () => {}, activateGif: async () => {},
+    setAutostart: async enabled => { autostart.push(enabled); }, searchGiphy: async () => {},
+    cancelGiphySearch: () => {}, hideWindow: () => {}, createTrayMenu: () => {}, broadcast: () => {}, publicState: () => ({})
+  });
+  await assert.rejects(handles.get("lclip:save-settings")({}, {
+    captureEnabled: true,
+    autostartEnabled: false,
+    giphyApiKey: "",
+    gifRating: "pg"
+  }), /disk full/);
+  assert.deepEqual(autostart, [false, originalUpdate]);
+  assert.equal(app.state.settings.autostartEnabled, originalUpdate);
 });
 
 test("persistence failures propagate through IPC", async () => {

@@ -25,7 +25,8 @@ const demoState = {
     buildRevision: "development checkout",
     session: "preview",
     desktop: "",
-    persistence: { state: "saved", message: "Changes are saved locally", lastSavedAt: Date.now(), pending: 0 }
+    persistence: { state: "saved", message: "Changes are saved locally", lastSavedAt: Date.now(), pending: 0 },
+    autostart: { configured: true, label: "Preview setting enabled" }
   }
 };
 
@@ -111,6 +112,7 @@ function render() {
   $("#sectionDescription").textContent = meta.description;
   $("#searchInput").placeholder = meta.placeholder;
   $("#results").setAttribute("aria-label", `${meta.title} results`);
+  $("#resultsMeta").replaceChildren();
   renderHeadingActions();
   if (state.mode === "clipboard") renderHistory();
   else if (state.mode === "emoji") renderGlyphs(emoji, false);
@@ -118,6 +120,26 @@ function render() {
   else if (state.mode === "symbols") renderGlyphs(symbols, false);
   else renderGifs();
   selectIndex(Math.min(state.selectedIndex, Math.max(0, selectables().length - 1)), false);
+}
+
+function configureOptionList(optionsElement) {
+  optionsElement.id = "lclip-options";
+  optionsElement.setAttribute("role", "listbox");
+  optionsElement.setAttribute("aria-label", `${modes[state.mode].title} results`);
+  const search = $("#searchInput");
+  search.setAttribute("role", "combobox");
+  search.setAttribute("aria-autocomplete", "list");
+  search.setAttribute("aria-controls", optionsElement.id);
+  search.setAttribute("aria-expanded", "true");
+}
+
+function configureStaticResults() {
+  const search = $("#searchInput");
+  search.setAttribute("role", "searchbox");
+  search.removeAttribute("aria-autocomplete");
+  search.setAttribute("aria-controls", "results");
+  search.removeAttribute("aria-expanded");
+  search.removeAttribute("aria-activedescendant");
 }
 
 function renderHeadingActions() {
@@ -146,6 +168,7 @@ function renderHeadingActions() {
   const categories = ["all", ...new Set(source.map(item => item.category))];
   categories.forEach(category => {
     const button = element("button", `category-chip${state.category === category ? " active" : ""}`, category[0].toUpperCase() + category.slice(1));
+    button.setAttribute("aria-pressed", String(state.category === category));
     button.onclick = () => { state.category = category; state.selectedIndex = 0; render(); };
     container.append(button);
   });
@@ -156,10 +179,17 @@ function renderHistory() {
   results.replaceChildren();
   const query = state.query.toLowerCase();
   const items = state.data.history.filter(item => item.text.toLowerCase().includes(query));
-  if (!items.length) return renderEmpty(results, query ? "No matching clipboard text" : "Clipboard history is ready", query ? "Try a different search." : "Copy text in any application. LClip will keep the latest ten items here.", "▣");
+  if (!items.length) {
+    configureStaticResults();
+    return renderEmpty(results, query ? "No matching clipboard text" : "Clipboard history is ready", query ? "Try a different search." : "Copy text in any application. LClip will keep the latest ten items here.", "▣");
+  }
+  const layout = element("div", "history-layout");
   const list = element("div", "history-list");
+  const actions = element("div", "history-actions");
+  actions.setAttribute("role", "toolbar");
+  actions.setAttribute("aria-label", "Clipboard history removal controls");
+  configureOptionList(list);
   items.forEach((item, index) => {
-    const wrapper = element("div", "history-item");
     const row = element("button", "history-row");
     row.type = "button";
     row.tabIndex = -1;
@@ -183,10 +213,11 @@ function renderHistory() {
       }
     };
     row.append(number, copy);
-    wrapper.append(row, remove);
-    list.append(wrapper);
+    list.append(row);
+    actions.append(remove);
   });
-  results.append(list);
+  layout.append(list, actions);
+  results.append(layout);
 }
 
 function renderGlyphs(source, isKaomoji) {
@@ -194,8 +225,12 @@ function renderGlyphs(source, isKaomoji) {
   results.replaceChildren();
   const query = state.query.toLowerCase();
   const items = source.filter(item => (state.category === "all" || item.category === state.category) && `${item.name} ${item.value}`.toLowerCase().includes(query));
-  if (!items.length) return renderEmpty(results, "No characters found", "Try another word or choose a different category.", "⌕");
+  if (!items.length) {
+    configureStaticResults();
+    return renderEmpty(results, "No characters found", "Try another word or choose a different category.", "⌕");
+  }
   const grid = element("div", `glyph-grid${isKaomoji ? " kaomoji-grid" : ""}`);
+  configureOptionList(grid);
   items.forEach((item, index) => {
     const button = element("button", "glyph-item");
     button.type = "button";
@@ -214,16 +249,25 @@ function renderGifs() {
   const results = $("#results");
   results.replaceChildren();
   if (state.gifState === "loading") {
+    configureStaticResults();
     const skeletons = element("div", "skeleton-grid");
     for (let i = 0; i < 12; i++) skeletons.append(element("div", "skeleton"));
     return results.append(skeletons);
   }
   if (state.gifState === "missing-key") {
+    configureStaticResults();
     return renderEmpty(results, "Connect GIPHY to search GIFs", "Add a GIPHY API key in Settings. All other LClip features remain fully offline.", "GIF", "Open settings", openSettings);
   }
-  if (state.gifState === "error") return renderEmpty(results, "GIF search is unavailable", "Check your connection and GIPHY API key, then try again.", "!", "Try again", loadGifs);
-  if (!state.gifs.length) return renderEmpty(results, "Search for a reaction", "Enter a word above, or leave search empty to see trending GIFs.", "GIF");
+  if (state.gifState === "error") {
+    configureStaticResults();
+    return renderEmpty(results, "GIF search is unavailable", "Check your connection and GIPHY API key, then try again.", "!", "Try again", loadGifs);
+  }
+  if (!state.gifs.length) {
+    configureStaticResults();
+    return renderEmpty(results, "Search for a reaction", "Enter a word above, or leave search empty to see trending GIFs.", "GIF");
+  }
   const grid = element("div", "gif-grid");
+  configureOptionList(grid);
   state.gifs.forEach((gif, index) => {
     const button = element("button", "gif-item");
     button.type = "button";
@@ -241,7 +285,8 @@ function renderGifs() {
   });
   const attribution = element("p", "gif-attribution");
   attribution.append("Powered by ", element("strong", "", "GIPHY"));
-  results.append(grid, attribution);
+  results.append(grid);
+  $("#resultsMeta").append(attribution);
 }
 
 function renderEmpty(container, title, description, icon, actionLabel, action) {
@@ -268,7 +313,11 @@ function selectIndex(index, scroll = true) {
     node.classList.toggle("selected", selected);
     node.setAttribute("aria-selected", String(selected));
   });
-  $("#searchInput").setAttribute("aria-activedescendant", nodes[state.selectedIndex].id);
+  if ($("#searchInput").getAttribute("role") === "combobox") {
+    $("#searchInput").setAttribute("aria-activedescendant", nodes[state.selectedIndex].id);
+  } else {
+    $("#searchInput").removeAttribute("aria-activedescendant");
+  }
   if (scroll) nodes[state.selectedIndex].scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
@@ -332,7 +381,9 @@ function openSettings() {
   sheet.removeAttribute("inert");
   requestAnimationFrame(() => sheet.classList.add("open"));
   $(".picker").setAttribute("inert", "");
+  $(".picker").setAttribute("aria-hidden", "true");
   $(".mode-rail").setAttribute("inert", "");
+  $(".mode-rail").setAttribute("aria-hidden", "true");
   $("#sheetScrim").classList.add("show");
   $("#settingsClose").focus();
 }
@@ -345,8 +396,11 @@ function renderIntegrationStatus() {
     ["Electron shortcut", shortcut.electron?.label || (status.shortcut ? "Registered" : "Unavailable"), shortcut.electron?.registered ? "ready" : "limited"],
     ["Wayland portal", shortcut.portal?.label || "Status unavailable", shortcut.portal?.active ? "ready" : "neutral"],
     ["GNOME native", shortcut.gnome?.label || "Status unavailable", shortcut.gnome?.configured ? "ready" : "neutral"],
-    ["Paste bridge", status.pasteBridge, status.automaticPaste ? "ready" : "limited"],
-    ["Local storage", status.persistence?.state === "error" ? `Save failed · ${status.persistence.message}` : "Changes are saved locally", status.persistence?.state === "error" ? "error" : "ready"]
+    ["Login startup", status.autostart?.label || "Status unavailable", status.autostart?.configured ? "ready" : "limited"],
+    ["Paste bridge", status.automaticPaste ? `${status.pasteBridge} · verified when used` : status.pasteBridge, status.automaticPaste ? "ready" : "limited"],
+    ["Local storage",
+      status.persistence?.state === "error" ? `Save failed · ${status.persistence.message}` : status.persistence?.state === "saving" ? "Saving changes locally" : "Changes are saved locally",
+      status.persistence?.state === "error" ? "error" : status.persistence?.state === "saving" ? "neutral" : "ready"]
   ];
   container.replaceChildren();
   rows.forEach(([label, value, condition]) => {
@@ -366,7 +420,9 @@ function closeSettings() {
   sheet.setAttribute("inert", "");
   setTimeout(() => { if (!sheet.classList.contains("open")) sheet.hidden = true; }, 220);
   $(".picker").removeAttribute("inert");
+  $(".picker").removeAttribute("aria-hidden");
   $(".mode-rail").removeAttribute("inert");
+  $(".mode-rail").removeAttribute("aria-hidden");
   $("#sheetScrim").classList.remove("show");
   $("#searchInput").focus();
 }
@@ -377,11 +433,11 @@ async function saveSettings() {
   button.textContent = "Saving…";
   try {
     state.data = await api.saveSettings({
+      captureEnabled: $("#captureSetting").checked,
       autostartEnabled: $("#autostartSetting").checked,
       giphyApiKey: $("#giphyKey").value,
       gifRating: $("#gifRating").value,
     });
-    if ($("#captureSetting").checked !== state.data.settings.captureEnabled) state.data = await api.setCapture($("#captureSetting").checked);
     closeSettings();
     render();
     toast("Settings saved");
@@ -427,19 +483,20 @@ document.addEventListener("keydown", event => {
   }
   if (settingsOpen) return;
   const searchActive = document.activeElement === $("#searchInput");
-  if (searchActive && (event.key === "ArrowDown" || event.key === "ArrowRight")) {
+  const listboxActive = searchActive && $("#searchInput").getAttribute("role") === "combobox";
+  if (listboxActive && (event.key === "ArrowDown" || event.key === "ArrowRight")) {
     event.preventDefault();
     selectIndex(state.selectedIndex + 1);
-  } else if (searchActive && (event.key === "ArrowUp" || event.key === "ArrowLeft")) {
+  } else if (listboxActive && (event.key === "ArrowUp" || event.key === "ArrowLeft")) {
     event.preventDefault();
     selectIndex(state.selectedIndex - 1);
-  } else if (searchActive && event.key === "Home") {
+  } else if (listboxActive && event.key === "Home") {
     event.preventDefault();
     selectIndex(0);
-  } else if (searchActive && event.key === "End") {
+  } else if (listboxActive && event.key === "End") {
     event.preventDefault();
     selectIndex(selectables().length - 1);
-  } else if (event.key === "Enter" && searchActive) {
+  } else if (event.key === "Enter" && listboxActive) {
     const nodes = selectables();
     if (nodes[state.selectedIndex]) { event.preventDefault(); nodes[state.selectedIndex].click(); }
   }
@@ -461,6 +518,27 @@ api.onOpen(() => {
   $("#results").scrollTop = 0;
 });
 
-state.data = await api.bootstrap();
+try {
+  state.data = await api.bootstrap();
+} catch (error) {
+  state.data = {
+    history: [],
+    settings: { captureEnabled: true, autostartEnabled: true, giphyApiKey: "", gifRating: "pg" },
+    status: {
+      shortcut: false,
+      shortcutLabel: "Super + .",
+      shortcutStatus: {},
+      pasteBridge: "Status unavailable",
+      automaticPaste: false,
+      windowBackend: "Status unavailable",
+      buildRevision: "unknown",
+      session: "unknown",
+      desktop: "",
+      persistence: { state: "error", message: String(error?.message || "Could not load LClip state"), lastSavedAt: null, pending: 0 },
+      autostart: { configured: false, label: "Status unavailable" }
+    }
+  };
+}
 render();
+if (state.data.status.persistence.state === "error") toast("LClip started without saved state. Open Settings for storage details.");
 $("#searchInput").focus();

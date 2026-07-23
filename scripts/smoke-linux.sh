@@ -24,6 +24,11 @@ if [[ -f /opt/lclip/resources/LCLIP_BUILD ]]; then
 else
   warn "Build marker is missing"
 fi
+if [[ -f "$HOME/.config/autostart/io.lclip.LClip.desktop" ]] && grep -q '^Hidden=false$' "$HOME/.config/autostart/io.lclip.LClip.desktop"; then
+  pass "Per-user login autostart is enabled"
+else
+  warn "Per-user login autostart is missing or disabled"
+fi
 
 BRIDGE=""
 for candidate in ydotool wtype xdotool; do
@@ -32,10 +37,15 @@ done
 if [[ -n "$BRIDGE" ]]; then pass "Automatic-paste bridge available: $BRIDGE"; else warn "No automatic-paste bridge found; copy-only fallback will be tested"; fi
 
 if [[ "${XDG_CURRENT_DESKTOP^^}" == *GNOME* ]] && command -v gsettings >/dev/null 2>&1; then
-  if gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings | grep -q '/lclip/'; then
-    pass "GNOME native Super + . shortcut entry is present"
+  GNOME_TARGET="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/"
+  GNOME_COMMAND="$(gsettings get "$GNOME_TARGET" command 2>/dev/null | tr -d "'" || true)"
+  GNOME_BINDING="$(gsettings get "$GNOME_TARGET" binding 2>/dev/null | tr -d "'" || true)"
+  if gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings | grep -q '/lclip/' \
+    && [[ "$GNOME_COMMAND" == "/usr/local/bin/lclip --show" ]] \
+    && [[ "$GNOME_BINDING" == "<Super>period" ]]; then
+    pass "GNOME native shortcut has the exact LClip command and Super + . binding"
   else
-    warn "GNOME native shortcut entry is missing; Electron portal registration may still work"
+    warn "GNOME native shortcut is missing or differs; inspect the separate Electron/portal status in Settings"
   fi
 fi
 

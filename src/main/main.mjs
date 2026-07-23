@@ -1,13 +1,13 @@
 import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } from "electron";
 import { readFileSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addHistoryItem, StateStore } from "./store.mjs";
 import { detectPasteBridge, pasteWithBridge } from "./paste-bridge.mjs";
 import { selectWindowBackend } from "./window-backend.mjs";
-import { downloadGiphyAsset } from "./giphy.mjs";
+import { downloadGiphyAsset, normalizeGiphyResults, readGiphySearchResponse, validateGiphyUrl } from "./giphy.mjs";
 import { registerLclipIpc } from "./ipc-handlers.mjs";
 import { buildShortcutStatus, detectGnomeNativeShortcut } from "./shortcut-status.mjs";
+import { writeAutostartEntry } from "./autostart.mjs";
 
 app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal,GlobalShortcutsPortalPreferredTrigger");
 const windowBackend = selectWindowBackend({
@@ -39,6 +39,7 @@ let lastPersistenceNotification = "";
 let gifDownloadController;
 let gifSearchController;
 let gnomeNativeShortcut = { supported: false, configured: false, label: "Not checked" };
+let autostartStatus = { configured: false, label: "Not checked" };
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
@@ -72,7 +73,8 @@ function publicState() {
       buildRevision,
       session: process.env.XDG_SESSION_TYPE || (process.platform === "linux" ? "unknown" : process.platform),
       desktop: process.env.XDG_CURRENT_DESKTOP || "",
-      persistence: store.persistenceSnapshot()
+      persistence: store.persistenceSnapshot(),
+      autostart: autostartStatus
     }
   };
 }
@@ -83,7 +85,11 @@ function broadcast() {
 
 function handlePersistenceStatus(status) {
   broadcast();
-  if (status.state !== "error" || status.message === lastPersistenceNotification) return;
+  if (status.state !== "error") {
+    if (status.state === "saved") lastPersistenceNotification = "";
+    return;
+  }
+  if (status.message === lastPersistenceNotification) return;
   lastPersistenceNotification = status.message;
   if (Notification.isSupported()) {
     new Notification({
@@ -276,19 +282,12 @@ async function searchGiphy(query) {
   gifSearchController = controller;
   const timeout = setTimeout(() => controller.abort(new Error("GIPHY search timed out")), 10_000);
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data?.meta?.msg || "GIPHY search failed");
+    const response = await fetch(url, { signal: controller.signal, redirect: "follow" });
+    validateGiphyUrl(response.url || url);
+    const data = await readGiphySearchResponse(response);
     return {
       state: "ready",
-      results: (data.data || []).map(item => ({
-        id: String(item.id),
-        title: String(item.title || "GIF").slice(0, 120),
-        preview: item.images?.fixed_width_small?.webp || item.images?.fixed_width?.webp || "",
-        original: item.images?.original?.url || "",
-        width: Number(item.images?.fixed_width_small?.width || 200),
-        height: Number(item.images?.fixed_width_small?.height || 120)
-      })).filter(item => item.preview && item.original)
+      results: normalizeGiphyResults(data)
     };
   } finally {
     clearTimeout(timeout);
@@ -302,14 +301,27 @@ function cancelGiphySearch() {
 }
 
 async function setAutostart(enabled) {
-  if (process.platform !== "linux") return;
-  const directory = join(app.getPath("home"), ".config", "autostart");
-  const override = join(directory, "io.lclip.LClip.desktop");
-  if (enabled) {
-    await rm(override, { force: true });
-  } else {
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    await writeFile(override, "[Desktop Entry]\nType=Application\nName=LClip\nHidden=true\n", { mode: 0o600 });
+  if (process.platform !== "linux") {
+    autostartStatus = { configured: false, label: "Linux installation required" };
+    return;
+  }
+  try {
+    await writeAutostartEntry({
+      home: app.getPath("home"),
+      enabled,
+      executable: process.env.APPIMAGE || process.execPath
+    });
+    autostartStatus = {
+      configured: true,
+      label: enabled ? "Starts after graphical login" : "Disabled for this user"
+    };
+  } catch (error) {
+    autostartStatus = {
+      configured: false,
+      label: `Autostart update failed · ${String(error?.message || "storage error").slice(0, 140)}`
+    };
+    broadcast();
+    throw error;
   }
 }
 
@@ -369,6 +381,11 @@ app.on("second-instance", (_event, argv) => {
 app.whenReady().then(async () => {
   store = new StateStore(join(app.getPath("userData"), "state.json"), { onPersistenceStatus: handlePersistenceStatus });
   await store.load();
+  if (store.persistenceSnapshot().state === "error") {
+    autostartStatus = { configured: false, label: "Not changed because saved settings could not be loaded" };
+  } else {
+    await setAutostart(store.state.settings.autostartEnabled).catch(() => {});
+  }
   bridge = await detectPasteBridge();
   gnomeNativeShortcut = await detectGnomeNativeShortcut();
   createWindow();
