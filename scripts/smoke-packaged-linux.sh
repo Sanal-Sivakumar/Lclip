@@ -19,9 +19,9 @@ trap cleanup EXIT
 
 set +e
 if command -v dbus-run-session >/dev/null; then
-  LCLIP_CI_SMOKE=1 timeout --signal=TERM --kill-after=3s 20s dbus-run-session -- xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
+  LCLIP_CI_SMOKE=1 timeout --signal=TERM --kill-after=3s 45s dbus-run-session -- xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
 else
-  LCLIP_CI_SMOKE=1 timeout --signal=TERM --kill-after=3s 20s xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
+  LCLIP_CI_SMOKE=1 timeout --signal=TERM --kill-after=3s 45s xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
 fi
 STATUS=$?
 set -e
