@@ -10,7 +10,23 @@ const demoState = {
     { id: "demo-3", text: "https://github.com/", createdAt: Date.now() - 3_600_000 }
   ],
   settings: { captureEnabled: true, autostartEnabled: true, giphyApiKey: "", gifRating: "pg" },
-  status: { shortcut: true, shortcutLabel: "Super + .", pasteBridge: "Preview mode · Linux bridge not active", automaticPaste: false, windowBackend: "Browser preview", buildRevision: "development checkout", session: "preview", desktop: "" }
+  status: {
+    shortcut: true,
+    shortcutLabel: "Super + .",
+    shortcutStatus: {
+      active: true,
+      electron: { registered: true, route: "Browser preview", label: "Preview shortcut simulation active" },
+      portal: { requested: false, active: false, label: "Not available in browser preview" },
+      gnome: { supported: false, configured: false, label: "Not a GNOME session" }
+    },
+    pasteBridge: "Preview mode · Linux bridge not active",
+    automaticPaste: false,
+    windowBackend: "Browser preview",
+    buildRevision: "development checkout",
+    session: "preview",
+    desktop: "",
+    persistence: { state: "saved", message: "Changes are saved locally", lastSavedAt: Date.now(), pending: 0 }
+  }
 };
 
 const demoApi = {
@@ -21,6 +37,7 @@ const demoApi = {
   setCapture: async enabled => { demoState.settings.captureEnabled = enabled; return structuredClone(demoState); },
   saveSettings: async settings => { demoState.settings = { ...demoState.settings, ...settings }; return structuredClone(demoState); },
   searchGifs: async () => ({ state: "missing-key", results: [] }),
+  cancelGifSearch: () => {},
   activateGif: async () => ({ ok: true, pasted: false }),
   hide: () => {},
   onState: () => () => {},
@@ -37,7 +54,8 @@ const state = {
   data: structuredClone(demoState),
   gifState: "idle",
   gifs: [],
-  gifTimer: null
+  gifTimer: null,
+  gifRequestId: 0
 };
 
 const modes = {
@@ -67,6 +85,11 @@ function formatAge(timestamp) {
 
 function setMode(mode) {
   if (!modes[mode]) return;
+  if (state.mode === "gifs" && mode !== "gifs") {
+    clearTimeout(state.gifTimer);
+    state.gifRequestId += 1;
+    api.cancelGifSearch();
+  }
   state.mode = mode;
   state.query = "";
   state.category = "all";
@@ -103,7 +126,14 @@ function renderHeadingActions() {
   container.replaceChildren();
   if (state.mode === "clipboard") {
     const pause = element("button", "quiet-action", state.data.settings.captureEnabled ? "Pause capture" : "Resume capture");
-    pause.onclick = async () => { state.data = await api.setCapture(!state.data.settings.captureEnabled); render(); };
+    pause.onclick = async () => {
+      try {
+        state.data = await api.setCapture(!state.data.settings.captureEnabled);
+        render();
+      } catch {
+        toast("Capture preference changed for this session, but could not be saved");
+      }
+    };
     const clear = element("button", "quiet-action", "Clear");
     clear.disabled = !state.data.history.length;
     clear.onclick = clearHistory;
@@ -129,21 +159,32 @@ function renderHistory() {
   if (!items.length) return renderEmpty(results, query ? "No matching clipboard text" : "Clipboard history is ready", query ? "Try a different search." : "Copy text in any application. LClip will keep the latest ten items here.", "▣");
   const list = element("div", "history-list");
   items.forEach((item, index) => {
-    const row = element("div", "history-row");
+    const wrapper = element("div", "history-item");
+    const row = element("button", "history-row");
+    row.type = "button";
     row.tabIndex = -1;
+    row.id = `lclip-option-${state.mode}-${index}`;
     row.dataset.selectable = "true";
     row.setAttribute("role", "option");
     row.setAttribute("aria-label", `Paste clipboard item ${index + 1}: ${item.text.slice(0, 80)}`);
-    row.onclick = event => { if (!event.target.closest(".remove-item")) activateValue(item.text); };
+    row.onclick = () => activateValue(item.text);
     const number = element("span", "history-index", String(index + 1));
     const copy = element("span", "history-copy");
     copy.append(element("strong", "", item.text.replace(/\s+/g, " ")), element("small", "", `${formatAge(item.createdAt)} · ${item.text.length} characters`));
     const remove = element("button", "remove-item", "×");
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove clipboard item ${index + 1}`);
-    remove.onclick = async event => { event.stopPropagation(); state.data.history = await api.removeHistory(item.id); render(); };
-    row.append(number, copy, remove);
-    list.append(row);
+    remove.onclick = async () => {
+      try {
+        state.data.history = await api.removeHistory(item.id);
+        render();
+      } catch {
+        toast("Item removed for this session, but the change could not be saved");
+      }
+    };
+    row.append(number, copy);
+    wrapper.append(row, remove);
+    list.append(wrapper);
   });
   results.append(list);
 }
@@ -155,10 +196,11 @@ function renderGlyphs(source, isKaomoji) {
   const items = source.filter(item => (state.category === "all" || item.category === state.category) && `${item.name} ${item.value}`.toLowerCase().includes(query));
   if (!items.length) return renderEmpty(results, "No characters found", "Try another word or choose a different category.", "⌕");
   const grid = element("div", `glyph-grid${isKaomoji ? " kaomoji-grid" : ""}`);
-  items.forEach(item => {
+  items.forEach((item, index) => {
     const button = element("button", "glyph-item");
     button.type = "button";
     button.dataset.selectable = "true";
+    button.id = `lclip-option-${state.mode}-${index}`;
     button.setAttribute("role", "option");
     button.setAttribute("aria-label", `Paste ${item.name}: ${item.value}`);
     button.onclick = () => activateValue(item.value);
@@ -182,10 +224,11 @@ function renderGifs() {
   if (state.gifState === "error") return renderEmpty(results, "GIF search is unavailable", "Check your connection and GIPHY API key, then try again.", "!", "Try again", loadGifs);
   if (!state.gifs.length) return renderEmpty(results, "Search for a reaction", "Enter a word above, or leave search empty to see trending GIFs.", "GIF");
   const grid = element("div", "gif-grid");
-  state.gifs.forEach(gif => {
+  state.gifs.forEach((gif, index) => {
     const button = element("button", "gif-item");
     button.type = "button";
     button.dataset.selectable = "true";
+    button.id = `lclip-option-${state.mode}-${index}`;
     button.setAttribute("role", "option");
     button.setAttribute("aria-label", `Paste GIF: ${gif.title}`);
     button.onclick = () => activateGif(gif);
@@ -215,19 +258,27 @@ function renderEmpty(container, title, description, icon, actionLabel, action) {
 function selectables() { return $$('[data-selectable="true"]'); }
 function selectIndex(index, scroll = true) {
   const nodes = selectables();
-  if (!nodes.length) return;
+  if (!nodes.length) {
+    $("#searchInput").removeAttribute("aria-activedescendant");
+    return;
+  }
   state.selectedIndex = Math.max(0, Math.min(index, nodes.length - 1));
   nodes.forEach((node, itemIndex) => {
     const selected = itemIndex === state.selectedIndex;
     node.classList.toggle("selected", selected);
     node.setAttribute("aria-selected", String(selected));
   });
+  $("#searchInput").setAttribute("aria-activedescendant", nodes[state.selectedIndex].id);
   if (scroll) nodes[state.selectedIndex].scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 async function activateValue(value) {
-  const result = await api.activate(value);
-  if (!result?.pasted) toast(api.platform === "browser" ? "Copied in preview mode" : "Copied · focus the target, then press Ctrl+V");
+  try {
+    const result = await api.activate(value);
+    if (!result?.pasted) toast(api.platform === "browser" ? "Copied in preview mode" : "Copied · focus the target, then press Ctrl+V");
+  } catch {
+    toast("Could not copy that item");
+  }
 }
 
 async function activateGif(gif) {
@@ -240,13 +291,16 @@ async function activateGif(gif) {
 }
 
 async function loadGifs() {
+  const requestId = ++state.gifRequestId;
   state.gifState = "loading";
   renderGifs();
   try {
     const response = await api.searchGifs(state.query);
+    if (requestId !== state.gifRequestId) return;
     state.gifState = response.state;
     state.gifs = response.results || [];
   } catch {
+    if (requestId !== state.gifRequestId) return;
     state.gifState = "error";
     state.gifs = [];
   }
@@ -254,10 +308,16 @@ async function loadGifs() {
 }
 
 async function clearHistory() {
-  await api.clearHistory();
-  state.data.history = [];
-  render();
-  toast("Clipboard history cleared");
+  try {
+    await api.clearHistory();
+    state.data.history = [];
+    render();
+    toast("Clipboard history cleared");
+  } catch {
+    state.data.history = [];
+    render();
+    toast("History cleared for this session, but the change could not be saved");
+  }
 }
 
 function openSettings() {
@@ -265,8 +325,7 @@ function openSettings() {
   $("#captureSetting").checked = state.data.settings.captureEnabled;
   $("#giphyKey").value = state.data.settings.giphyApiKey || "";
   $("#gifRating").value = state.data.settings.gifRating || "pg";
-  const shortcut = state.data.status.shortcut ? "Shortcut registered" : "Shortcut unavailable";
-  $("#integrationCard").textContent = `${shortcut} · ${state.data.status.pasteBridge}. Window: ${state.data.status.windowBackend || "Native desktop"}. Build: ${state.data.status.buildRevision || "unknown"}. Session: ${state.data.status.session}${state.data.status.desktop ? ` · ${state.data.status.desktop}` : ""}.`;
+  renderIntegrationStatus();
   const sheet = $("#settingsSheet");
   sheet.hidden = false;
   sheet.setAttribute("aria-hidden", "false");
@@ -276,6 +335,28 @@ function openSettings() {
   $(".mode-rail").setAttribute("inert", "");
   $("#sheetScrim").classList.add("show");
   $("#settingsClose").focus();
+}
+
+function renderIntegrationStatus() {
+  const container = $("#integrationCard");
+  const status = state.data.status;
+  const shortcut = status.shortcutStatus || {};
+  const rows = [
+    ["Electron shortcut", shortcut.electron?.label || (status.shortcut ? "Registered" : "Unavailable"), shortcut.electron?.registered ? "ready" : "limited"],
+    ["Wayland portal", shortcut.portal?.label || "Status unavailable", shortcut.portal?.active ? "ready" : "neutral"],
+    ["GNOME native", shortcut.gnome?.label || "Status unavailable", shortcut.gnome?.configured ? "ready" : "neutral"],
+    ["Paste bridge", status.pasteBridge, status.automaticPaste ? "ready" : "limited"],
+    ["Local storage", status.persistence?.state === "error" ? `Save failed · ${status.persistence.message}` : "Changes are saved locally", status.persistence?.state === "error" ? "error" : "ready"]
+  ];
+  container.replaceChildren();
+  rows.forEach(([label, value, condition]) => {
+    const row = element("div", "integration-status");
+    row.dataset.state = condition;
+    row.append(element("strong", "", label), element("span", "", value));
+    container.append(row);
+  });
+  const detail = element("p", "integration-detail", `Window: ${status.windowBackend || "Native desktop"} · Build: ${status.buildRevision || "unknown"} · Session: ${status.session}${status.desktop ? ` · ${status.desktop}` : ""}`);
+  container.append(detail);
 }
 
 function closeSettings() {
@@ -291,15 +372,25 @@ function closeSettings() {
 }
 
 async function saveSettings() {
-  state.data = await api.saveSettings({
-    autostartEnabled: $("#autostartSetting").checked,
-    giphyApiKey: $("#giphyKey").value,
-    gifRating: $("#gifRating").value,
-  });
-  if ($("#captureSetting").checked !== state.data.settings.captureEnabled) state.data = await api.setCapture($("#captureSetting").checked);
-  closeSettings();
-  render();
-  toast("Settings saved");
+  const button = $("#saveSettingsButton");
+  button.disabled = true;
+  button.textContent = "Saving…";
+  try {
+    state.data = await api.saveSettings({
+      autostartEnabled: $("#autostartSetting").checked,
+      giphyApiKey: $("#giphyKey").value,
+      gifRating: $("#gifRating").value,
+    });
+    if ($("#captureSetting").checked !== state.data.settings.captureEnabled) state.data = await api.setCapture($("#captureSetting").checked);
+    closeSettings();
+    render();
+    toast("Settings saved");
+  } catch {
+    toast("Settings could not be saved. Check storage permissions and available disk space.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Save settings";
+  }
 }
 
 function toast(message) {
@@ -335,19 +426,35 @@ document.addEventListener("keydown", event => {
     return;
   }
   if (settingsOpen) return;
-  if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+  const searchActive = document.activeElement === $("#searchInput");
+  if (searchActive && (event.key === "ArrowDown" || event.key === "ArrowRight")) {
     event.preventDefault();
     selectIndex(state.selectedIndex + 1);
-  } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+  } else if (searchActive && (event.key === "ArrowUp" || event.key === "ArrowLeft")) {
     event.preventDefault();
     selectIndex(state.selectedIndex - 1);
-  } else if (event.key === "Enter" && document.activeElement === $("#searchInput")) {
+  } else if (searchActive && event.key === "Home") {
+    event.preventDefault();
+    selectIndex(0);
+  } else if (searchActive && event.key === "End") {
+    event.preventDefault();
+    selectIndex(selectables().length - 1);
+  } else if (event.key === "Enter" && searchActive) {
     const nodes = selectables();
     if (nodes[state.selectedIndex]) { event.preventDefault(); nodes[state.selectedIndex].click(); }
   }
 });
 
-api.onState(next => { state.data = next; render(); });
+api.onState(next => {
+  const previousError = state.data?.status?.persistence?.state === "error" ? state.data.status.persistence.message : "";
+  state.data = next;
+  render();
+  if ($("#settingsSheet").classList.contains("open")) renderIntegrationStatus();
+  const persistence = next?.status?.persistence;
+  if (persistence?.state === "error" && persistence.message !== previousError) {
+    toast("Local save failed. Your current session is still available; changes may be lost after restart.");
+  }
+});
 api.onOpen(() => {
   closeSettings();
   setMode("clipboard");

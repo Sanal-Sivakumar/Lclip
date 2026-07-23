@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { addHistoryItem, StateStore } from "./store.mjs";
 import { detectPasteBridge, pasteWithBridge } from "./paste-bridge.mjs";
 import { selectWindowBackend } from "./window-backend.mjs";
+import { downloadGiphyAsset } from "./giphy.mjs";
+import { registerLclipIpc } from "./ipc-handlers.mjs";
+import { buildShortcutStatus, detectGnomeNativeShortcut } from "./shortcut-status.mjs";
 
 app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal,GlobalShortcutsPortalPreferredTrigger");
 const windowBackend = selectWindowBackend({
@@ -31,6 +34,11 @@ let rendererReady = false;
 let pendingShow = false;
 let hasPositionedWindow = false;
 let activationInProgress = false;
+let quitAfterFlush = false;
+let lastPersistenceNotification = "";
+let gifDownloadController;
+let gifSearchController;
+let gnomeNativeShortcut = { supported: false, configured: false, label: "Not checked" };
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
@@ -44,24 +52,45 @@ const buildRevision = (() => {
 
 function publicState() {
   const snapshot = store.snapshot();
+  const shortcutStatus = buildShortcutStatus({
+    electronRegistered: shortcutRegistered,
+    platform: process.platform,
+    env: process.env,
+    windowBackend,
+    gnome: gnomeNativeShortcut
+  });
   return {
     history: snapshot.history,
     settings: snapshot.settings,
     status: {
-      shortcut: shortcutRegistered,
+      shortcut: shortcutStatus.active,
       shortcutLabel: "Super + .",
+      shortcutStatus,
       pasteBridge: bridge.label,
       automaticPaste: bridge.automatic,
       windowBackend: windowBackend.label,
       buildRevision,
       session: process.env.XDG_SESSION_TYPE || (process.platform === "linux" ? "unknown" : process.platform),
-      desktop: process.env.XDG_CURRENT_DESKTOP || ""
+      desktop: process.env.XDG_CURRENT_DESKTOP || "",
+      persistence: store.persistenceSnapshot()
     }
   };
 }
 
 function broadcast() {
   if (window && !window.isDestroyed()) window.webContents.send("lclip:state", publicState());
+}
+
+function handlePersistenceStatus(status) {
+  broadcast();
+  if (status.state !== "error" || status.message === lastPersistenceNotification) return;
+  lastPersistenceNotification = status.message;
+  if (Notification.isSupported()) {
+    new Notification({
+      title: "LClip could not save local data",
+      body: "Your current session is still available, but changes may be lost after restart. Open Settings for details."
+    }).show();
+  }
 }
 
 function createWindow() {
@@ -210,24 +239,11 @@ async function activateText(text) {
 }
 
 async function activateGif(gif) {
-  const requested = String(gif?.original || "");
-  let url;
-  try {
-    const parsed = new URL(requested);
-    if (parsed.protocol !== "https:" || !(parsed.hostname === "giphy.com" || parsed.hostname.endsWith(".giphy.com"))) throw new Error();
-    url = parsed.toString();
-  } catch {
-    throw new Error("Unsupported GIF source");
-  }
+  gifDownloadController?.abort();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  gifDownloadController = controller;
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error("GIF download failed");
-    const declared = Number(response.headers.get("content-length") || 0);
-    if (declared > 15_000_000) throw new Error("GIF is too large");
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length > 15_000_000) throw new Error("GIF is too large");
+    const { bytes, url } = await downloadGiphyAsset(gif?.original, { signal: controller.signal });
     const image = nativeImage.createFromBuffer(bytes);
     clipboard.write({
       text: url,
@@ -239,7 +255,7 @@ async function activateGif(gif) {
     broadcast();
     return { ok: true, pasted };
   } finally {
-    clearTimeout(timeout);
+    if (gifDownloadController === controller) gifDownloadController = undefined;
   }
 }
 
@@ -255,20 +271,34 @@ async function searchGiphy(query) {
   url.searchParams.set("lang", "en");
   url.searchParams.set("bundle", "messaging_non_clips");
   if (term) url.searchParams.set("q", term);
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.meta?.msg || "GIPHY search failed");
-  return {
-    state: "ready",
-    results: (data.data || []).map(item => ({
-      id: String(item.id),
-      title: String(item.title || "GIF").slice(0, 120),
-      preview: item.images?.fixed_width_small?.webp || item.images?.fixed_width?.webp || "",
-      original: item.images?.original?.url || "",
-      width: Number(item.images?.fixed_width_small?.width || 200),
-      height: Number(item.images?.fixed_width_small?.height || 120)
-    })).filter(item => item.preview && item.original)
-  };
+  gifSearchController?.abort();
+  const controller = new AbortController();
+  gifSearchController = controller;
+  const timeout = setTimeout(() => controller.abort(new Error("GIPHY search timed out")), 10_000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.meta?.msg || "GIPHY search failed");
+    return {
+      state: "ready",
+      results: (data.data || []).map(item => ({
+        id: String(item.id),
+        title: String(item.title || "GIF").slice(0, 120),
+        preview: item.images?.fixed_width_small?.webp || item.images?.fixed_width?.webp || "",
+        original: item.images?.original?.url || "",
+        width: Number(item.images?.fixed_width_small?.width || 200),
+        height: Number(item.images?.fixed_width_small?.height || 120)
+      })).filter(item => item.preview && item.original)
+    };
+  } finally {
+    clearTimeout(timeout);
+    if (gifSearchController === controller) gifSearchController = undefined;
+  }
+}
+
+function cancelGiphySearch() {
+  gifSearchController?.abort();
+  gifSearchController = undefined;
 }
 
 async function setAutostart(enabled) {
@@ -290,8 +320,8 @@ function createTray() {
   tray.setToolTip("LClip · Super + .");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open LClip", accelerator: "Super+.", click: showWindow },
-    { label: store.state.settings.captureEnabled ? "Pause clipboard capture" : "Resume clipboard capture", click: () => {
-      store.update(state => { state.settings.captureEnabled = !state.settings.captureEnabled; });
+    { label: store.state.settings.captureEnabled ? "Pause clipboard capture" : "Resume clipboard capture", click: async () => {
+      await store.updateAndPersist(state => { state.settings.captureEnabled = !state.settings.captureEnabled; }).catch(() => {});
       createTrayMenu();
       broadcast();
     } },
@@ -305,8 +335,8 @@ function createTrayMenu() {
   if (!tray) return createTray();
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open LClip", accelerator: "Super+.", click: showWindow },
-    { label: store.state.settings.captureEnabled ? "Pause clipboard capture" : "Resume clipboard capture", click: () => {
-      store.update(state => { state.settings.captureEnabled = !state.settings.captureEnabled; });
+    { label: store.state.settings.captureEnabled ? "Pause clipboard capture" : "Resume clipboard capture", click: async () => {
+      await store.updateAndPersist(state => { state.settings.captureEnabled = !state.settings.captureEnabled; }).catch(() => {});
       createTrayMenu();
       broadcast();
     } },
@@ -316,38 +346,19 @@ function createTrayMenu() {
 }
 
 function registerIpc() {
-  ipcMain.handle("lclip:bootstrap", () => publicState());
-  ipcMain.handle("lclip:activate", (_event, value) => activateText(value));
-  ipcMain.handle("lclip:activate-gif", (_event, gif) => activateGif(gif));
-  ipcMain.handle("lclip:remove-history", (_event, id) => {
-    const state = store.update(draft => { draft.history = draft.history.filter(item => item.id !== id); });
-    broadcast();
-    return state.history;
+  registerLclipIpc({
+    ipcMain,
+    store,
+    activateText,
+    activateGif,
+    setAutostart,
+    searchGiphy,
+    cancelGiphySearch,
+    hideWindow: () => window?.hide(),
+    createTrayMenu,
+    broadcast,
+    publicState
   });
-  ipcMain.handle("lclip:clear-history", () => {
-    store.update(state => { state.history = []; });
-    broadcast();
-    return true;
-  });
-  ipcMain.handle("lclip:set-capture", (_event, enabled) => {
-    store.update(state => { state.settings.captureEnabled = Boolean(enabled); });
-    createTrayMenu();
-    broadcast();
-    return publicState();
-  });
-  ipcMain.handle("lclip:save-settings", async (_event, settings) => {
-    const allowed = {
-      autostartEnabled: Boolean(settings?.autostartEnabled),
-      giphyApiKey: String(settings?.giphyApiKey || "").trim().slice(0, 180),
-      gifRating: ["g", "pg", "pg-13"].includes(settings?.gifRating) ? settings.gifRating : "pg"
-    };
-    store.update(state => { state.settings = { ...state.settings, ...allowed }; });
-    await setAutostart(allowed.autostartEnabled);
-    broadcast();
-    return publicState();
-  });
-  ipcMain.handle("lclip:search-gifs", (_event, query) => searchGiphy(query));
-  ipcMain.on("lclip:hide", () => window?.hide());
 }
 
 app.on("second-instance", (_event, argv) => {
@@ -356,9 +367,10 @@ app.on("second-instance", (_event, argv) => {
 });
 
 app.whenReady().then(async () => {
-  store = new StateStore(join(app.getPath("userData"), "state.json"));
+  store = new StateStore(join(app.getPath("userData"), "state.json"), { onPersistenceStatus: handlePersistenceStatus });
   await store.load();
   bridge = await detectPasteBridge();
+  gnomeNativeShortcut = await detectGnomeNativeShortcut();
   createWindow();
   registerIpc();
   createTray();
@@ -370,8 +382,15 @@ app.whenReady().then(async () => {
 });
 
 app.on("activate", showWindow);
-app.on("before-quit", () => {
+app.on("before-quit", event => {
   isQuitting = true;
   clearInterval(monitor);
   globalShortcut.unregisterAll();
+  cancelGiphySearch();
+  gifDownloadController?.abort();
+  if (store?.hasPendingWrites && !quitAfterFlush) {
+    event.preventDefault();
+    quitAfterFlush = true;
+    store.flush().catch(() => {}).finally(() => app.quit());
+  }
 });

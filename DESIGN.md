@@ -22,7 +22,7 @@ Use the Linux system UI stack: `system-ui`, Ubuntu, Cantarell, Noto Sans, and sa
 
 ## Shape and Layout
 
-The picker is a compact 700x510 floating utility with 11–16px structural radii and a full-pill treatment only for the small drag indicator. A narrow tab rail anchors the left edge. A 28px clear drag strip sits above Search; bounded, independently scrolling results occupy the remaining surface. There is no persistent footer, leaving more room for results and removing information that is unnecessary during routine use.
+The picker is a compact 700x510 floating utility with 11–16px structural radii and a full-pill treatment only for the small drag indicator. A narrow tab rail anchors the left edge. A 44px clear drag strip keeps the close target accessible above Search; bounded, independently scrolling results occupy the remaining surface. There is no persistent footer, leaving more room for results and removing information that is unnecessary during routine use.
 
 ## Materials
 

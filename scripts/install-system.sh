@@ -39,6 +39,10 @@ if [[ "$SKIP_BRIDGE" -eq 1 && "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
   echo "--configure-ydotool and --skip-input-bridge cannot be used together." >&2
   exit 1
 fi
+if [[ "$CONFIGURE_YDOTOOL" -eq 1 && "${EUID}" -eq 0 ]]; then
+  echo "Run this installer as the desktop user without sudo; it will request sudo when needed." >&2
+  exit 1
+fi
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=()
@@ -77,25 +81,55 @@ stop_running_lclip() {
   pkill -KILL -f '^/opt/lclip/lclip( |$)' 2>/dev/null || true
 }
 
-stop_running_lclip
-
-echo "Installing LClip in /opt/lclip…"
-"${SUDO[@]}" rm -rf /opt/lclip.new
-"${SUDO[@]}" install -d -m 0755 /opt/lclip.new /usr/local/bin /usr/share/applications /usr/share/icons/hicolor/scalable/apps /etc/xdg/autostart
-"${SUDO[@]}" cp -a "$BUNDLE"/. /opt/lclip.new/
-"${SUDO[@]}" rm -rf /opt/lclip
-"${SUDO[@]}" mv /opt/lclip.new /opt/lclip
-"${SUDO[@]}" chown -R root:root /opt/lclip
-if [[ -f /opt/lclip/chrome-sandbox ]]; then
-  "${SUDO[@]}" chmod 4755 /opt/lclip/chrome-sandbox
-fi
-
 SOURCE_REVISION="$(git -C "$PROJECT_DIR" rev-parse --short=12 HEAD 2>/dev/null || true)"
 if [[ -z "$SOURCE_REVISION" ]]; then SOURCE_REVISION="v$(node -p 'require("./package.json").version')"; fi
 BUILD_MARKER="$(mktemp)"
 printf '%s\n' "$SOURCE_REVISION" >"$BUILD_MARKER"
-"${SUDO[@]}" install -m 0644 "$BUILD_MARKER" /opt/lclip/resources/LCLIP_BUILD
+
+INSTALL_PATH="/opt/lclip"
+STAGED_PATH="/opt/lclip.new"
+ROLLBACK_PATH="/opt/lclip.rollback"
+HAD_PREVIOUS_INSTALL=0
+ROLLBACK_ACTIVE=0
+
+rollback_install() {
+  local status="${1:-$?}"
+  trap - ERR
+  if [[ "$ROLLBACK_ACTIVE" -eq 1 ]]; then
+    echo "Installation failed; restoring the previous LClip bundle…" >&2
+    "${SUDO[@]}" rm -rf "$INSTALL_PATH"
+    if [[ "$HAD_PREVIOUS_INSTALL" -eq 1 && -d "$ROLLBACK_PATH" ]]; then
+      "${SUDO[@]}" mv "$ROLLBACK_PATH" "$INSTALL_PATH"
+    fi
+  fi
+  "${SUDO[@]}" rm -rf "$STAGED_PATH"
+  exit "$status"
+}
+
+echo "Staging LClip for a rollback-safe installation…"
+"${SUDO[@]}" rm -rf "$STAGED_PATH" "$ROLLBACK_PATH"
+"${SUDO[@]}" install -d -m 0755 "$STAGED_PATH" /usr/local/bin /usr/share/applications /usr/share/icons/hicolor/scalable/apps /etc/xdg/autostart
+"${SUDO[@]}" cp -a "$BUNDLE"/. "$STAGED_PATH"/
+"${SUDO[@]}" chown -R root:root "$STAGED_PATH"
+if [[ -f "$STAGED_PATH/chrome-sandbox" ]]; then
+  "${SUDO[@]}" chmod 4755 "$STAGED_PATH/chrome-sandbox"
+fi
+"${SUDO[@]}" install -m 0644 "$BUILD_MARKER" "$STAGED_PATH/resources/LCLIP_BUILD"
 rm -f "$BUILD_MARKER"
+
+stop_running_lclip
+
+if [[ -d "$INSTALL_PATH" ]]; then
+  "${SUDO[@]}" mv "$INSTALL_PATH" "$ROLLBACK_PATH"
+  HAD_PREVIOUS_INSTALL=1
+fi
+if ! "${SUDO[@]}" mv "$STAGED_PATH" "$INSTALL_PATH"; then
+  if [[ "$HAD_PREVIOUS_INSTALL" -eq 1 ]]; then "${SUDO[@]}" mv "$ROLLBACK_PATH" "$INSTALL_PATH"; fi
+  echo "The staged LClip bundle could not be activated; the previous installation was restored." >&2
+  exit 1
+fi
+ROLLBACK_ACTIVE=1
+trap rollback_install ERR
 
 LAUNCHER="$(mktemp)"
 DESKTOP="$(mktemp)"
@@ -183,12 +217,11 @@ fi
 
 NEEDS_RELOGIN=0
 if [[ "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
-  [[ "${EUID}" -ne 0 ]] || { echo "Run this installer as the desktop user without sudo; it will request sudo when needed." >&2; exit 1; }
-  command -v ydotool >/dev/null || { echo "ydotool could not be installed from this distribution's repositories." >&2; exit 1; }
+  command -v ydotool >/dev/null || { echo "ydotool could not be installed from this distribution's repositories." >&2; rollback_install 1; }
   command -v ydotoold >/dev/null || install_bridge_package ydotoold || true
-  command -v ydotoold >/dev/null || { echo "The ydotoold daemon could not be installed. Automatic ydotool paste is unavailable." >&2; exit 1; }
+  command -v ydotoold >/dev/null || { echo "The ydotoold daemon could not be installed. Automatic ydotool paste is unavailable." >&2; rollback_install 1; }
   LOGIN_USER="${SUDO_USER:-${USER:-}}"
-  [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]] || { echo "Run this installer as the desktop user, not with sudo, to configure ydotool." >&2; exit 1; }
+  [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]] || { echo "Run this installer as the desktop user, not with sudo, to configure ydotool." >&2; rollback_install 1; }
 
   echo "Configuring restricted /dev/uinput access for $LOGIN_USER…"
   "${SUDO[@]}" groupadd --system --force lclip-uinput
@@ -237,6 +270,10 @@ fi
 
 command -v update-desktop-database >/dev/null && "${SUDO[@]}" update-desktop-database /usr/share/applications || true
 command -v gtk-update-icon-cache >/dev/null && "${SUDO[@]}" gtk-update-icon-cache -f /usr/share/icons/hicolor || true
+
+ROLLBACK_ACTIVE=0
+trap - ERR
+"${SUDO[@]}" rm -rf "$ROLLBACK_PATH"
 
 echo
 echo "LClip is installed."

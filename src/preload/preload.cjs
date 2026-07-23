@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("lclip", {
   setCapture: enabled => ipcRenderer.invoke("lclip:set-capture", enabled),
   saveSettings: settings => ipcRenderer.invoke("lclip:save-settings", settings),
   searchGifs: query => ipcRenderer.invoke("lclip:search-gifs", query),
+  cancelGifSearch: () => ipcRenderer.send("lclip:cancel-gif-search"),
   activateGif: gif => ipcRenderer.invoke("lclip:activate-gif", gif),
   hide: () => ipcRenderer.send("lclip:hide"),
   onState: callback => listen("lclip:state", callback),

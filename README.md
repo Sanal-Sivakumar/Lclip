@@ -5,6 +5,7 @@
   <p>A private, system-integrated clipboard history and expression picker for Linux.</p>
   <p>
     <a href="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml"><img src="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml/badge.svg" alt="Verify LClip status"></a>
+    <img src="https://img.shields.io/badge/release-1.0.0--beta.1-c1e8f8?style=flat-square" alt="Current source version 1.0.0 beta 1">
     <img src="https://img.shields.io/badge/Linux-GNOME%20%7C%20KDE-85bed8?style=flat-square&logo=linux&logoColor=white" alt="Linux GNOME and KDE">
     <img src="https://img.shields.io/badge/Wayland%20%2B%20X11-28404c?style=flat-square" alt="Wayland and X11">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-c1e8f8?style=flat-square" alt="GNU GPL version 3 license"></a>
@@ -16,18 +17,19 @@
 
 ---
 
-LClip stays ready after graphical login. Press `Super + .` from any application to open a compact, dark layered-glass picker containing the last 10 copied text items, more than 200 offline emoji, kaomoji, GIFs, and useful symbols.
+LClip stays ready after graphical login. Press `Super + .` from any application to open a compact, dark layered-glass picker containing the last 10 copied text items, 244 offline emoji, 60 kaomoji, optional GIF search, and 124 useful symbols.
 
 > [!IMPORTANT]
 > LClip never replaces normal `Ctrl+C` or `Ctrl+V`. It registers only `Super + .`; it is not a keylogger and does not receive unrelated keystrokes.
 
-**[Install LClip](#install-on-linux)** · **[Read the technical guide](technical_details.md)** · **[Open troubleshooting](troubleshooting.md)**
+**[Beta downloads](#beta-downloads)** · **[Install from source](#install-on-linux)** · **[Read the technical guide](technical_details.md)** · **[Open troubleshooting](troubleshooting.md)**
 
 ## Contents
 
 - [Features](#features)
 - [How LClip behaves](#how-lclip-behaves)
 - [Linux support](#linux-support)
+- [Beta downloads](#beta-downloads)
 - [Install on Linux](#install-on-linux)
 - [Global shortcut integration](#global-shortcut-integration)
 - [Automatic paste on Wayland](#automatic-paste-on-wayland)
@@ -45,8 +47,8 @@ LClip stays ready after graphical login. Press `Super + .` from any application 
 | | Capability | What it gives you |
 | --- | --- | --- |
 | **▣** | **Clipboard history** | The latest 10 non-empty copied text items, deduplicated and stored locally |
-| **☺** | **Emoji picker** | More than 200 searchable, categorized Unicode emoji with Noto Color Emoji preferred on Linux |
-| **ツ** | **Kaomoji** | More than 60 categorized text faces that need no special image support |
+| **☺** | **Emoji picker** | 244 searchable, categorized Unicode emoji with Noto Color Emoji preferred on Linux |
+| **ツ** | **Kaomoji** | 60 categorized text faces that need no special image support |
 | **GIF** | **GIPHY search** | Optional reaction search with a user-supplied API key |
 | **Ω** | **Special characters** | More than 100 arrows, currencies, mathematics, punctuation, Greek, marks, and technical symbols |
 | **⌨** | **Keyboard-first control** | Search, arrow navigation, `Enter` to paste, and `Esc` to close |
@@ -121,6 +123,23 @@ Recommended environment:
 - Node.js 22.12.0 or newer and npm for building from source
 - `sudo` for the system-wide installation step
 
+## Beta downloads
+
+The repository is prepared for `v1.0.0-beta.1`, but that tag is not treated as published merely because the source version exists. Once a maintainer pushes the annotated tag and both native architecture jobs pass, the GitHub release provides these direct installer paths:
+
+| Architecture | AppImage | Distribution packages |
+| --- | --- | --- |
+| x86-64 | [Download AppImage](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-x64.AppImage) | [Debian](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-x64.deb) · [RPM](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-x64.rpm) |
+| ARM64 | [Download AppImage](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-arm64.AppImage) | [Debian](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-arm64.deb) · [RPM](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-arm64.rpm) |
+
+The same release includes [`SHA256SUMS`](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/SHA256SUMS). Check the [Releases page](https://github.com/Sanal-Sivakumar/Lclip/releases) first: if the tag is absent, these versioned links intentionally do not masquerade as a working download. Beta means the automated checks passed while some real-desktop rows in [`docs/linux-smoke-test.md`](docs/linux-smoke-test.md) may remain pending.
+
+Verify a downloaded file from the directory containing it:
+
+```bash
+sha256sum --check SHA256SUMS --ignore-missing
+```
+
 ## Install on Linux
 
 ### Before you begin
@@ -185,7 +204,7 @@ The installer performs the complete setup:
 3. Runs syntax checks and all automated tests.
 4. Deletes stale `dist/` output and builds a fresh Electron application bundle.
 5. Stops any resident older LClip process before replacing the installation.
-6. Detects whether the laptop uses x86-64 or ARM64 and installs the matching bundle atomically under `/opt/lclip`.
+6. Detects whether the laptop uses x86-64 or ARM64, stages the matching bundle, and restores the previous `/opt/lclip` installation automatically if activation or system integration fails.
 7. Records the installed Git revision and starts the new resident process in the current graphical session.
 8. Creates the `lclip` terminal command and application-menu entry.
 9. Adds graphical-login autostart for supported desktop environments.
@@ -325,7 +344,7 @@ Useful controls:
 
 GIF search is the only network-backed feature. Create a GIPHY developer key, open LClip Settings, enter the key, choose a content rating, and save.
 
-The request is made by Electron's main process. The renderer is not allowed to make arbitrary network connections. Results are limited to HTTPS URLs belonging to GIPHY, downloads time out after 12 seconds, and a selected GIF is rejected if its downloaded data exceeds 15 MB.
+The request is made by Electron's main process. The renderer is not allowed to make arbitrary network connections. Results are limited to HTTPS URLs belonging to GIPHY. New searches cancel older in-flight requests, selected downloads time out after 12 seconds, redirects are revalidated, and the response stream is cancelled as soon as downloaded data exceeds 15 MB.
 
 Applications treat GIF clipboard content differently. LClip places an image, an HTML image reference, and the GIPHY URL on the clipboard so the target can choose a supported format. Plain-text targets may paste only the URL.
 
@@ -343,6 +362,14 @@ Run syntax checks and the automated tests:
 ```bash
 npm run verify
 ```
+
+After installing a release candidate on Linux, run the guided desktop smoke test:
+
+```bash
+npm run smoke:linux
+```
+
+The complete GNOME, KDE, X11, and ARM64 acceptance matrix is in [`docs/linux-smoke-test.md`](docs/linux-smoke-test.md).
 
 Build an unpacked Linux application:
 
@@ -365,11 +392,13 @@ LClip is an Electron application split into security boundaries:
 - `src/main/main.mjs` owns the desktop window, clipboard monitor, global shortcut, tray, state, GIPHY requests, and system integration.
 - `src/main/store.mjs` validates, limits, deduplicates, and persists local state.
 - `src/main/paste-bridge.mjs` detects and invokes a supported Linux input tool.
+- `src/main/giphy.mjs` validates GIPHY URLs and enforces streaming download limits.
+- `src/main/ipc-handlers.mjs` defines the narrow, independently tested IPC contract.
 - `src/main/window-backend.mjs` selects native or Xwayland-compatible rendering for reliable window movement.
 - `src/preload/preload.cjs` exposes a small, named API to the UI through Electron's context bridge.
 - `src/renderer/` contains the HTML, layered-material CSS, browser-side interaction code, and offline character catalog.
 - `scripts/` contains the Linux system installer and uninstaller.
-- `tests/` verifies history rules, paste-bridge selection, and minimum offline catalog coverage.
+- `tests/` verifies history and persistence behavior, IPC contracts, network limits, paste-bridge selection, window-backend decisions, and offline catalog coverage.
 
 See [technical_details.md](technical_details.md) for a beginner-friendly explanation of Electron, GNOME, KDE, X11, Wayland, portals, IPC, autostart, packaging, and every major runtime flow.
 
@@ -388,14 +417,18 @@ Clipboard managers are inherently sensitive because copied text can contain secr
 
 ## GitHub and releases
 
-The CI workflow verifies pushes and pull requests and uploads an unpacked x86-64 Linux build. The release workflow builds AppImage and Debian packages when a version tag is pushed.
+CI runs syntax, state, IPC, network-boundary, desktop-status, and catalog tests, audits the dependency graph, then creates native unpacked builds on x86-64 and ARM64 runners. A matching version tag builds AppImage, Debian, and RPM installers on both architectures, renames them to stable direct-download paths, generates `SHA256SUMS`, and records build provenance attestations.
 
 ```bash
-git tag v1.0.0
-git push origin main --tags
+npm run verify
+npm audit --audit-level=high
+npm run verify:release
+git tag -a v1.0.0-beta.1 -m "LClip 1.0.0-beta.1"
+git push origin main
+git push origin v1.0.0-beta.1
 ```
 
-Review the generated release on GitHub before distributing it. RPM packaging is available through the local `npm run dist:linux` command but is not currently included in the release workflow.
+Tags are immutable publication boundaries: do not replace artifacts on an existing tag. Beta releases may retain explicitly pending real-desktop checks; a stable version is rejected while the smoke-test matrix still contains a pending row. Follow the complete gate in [RELEASE.md](RELEASE.md) and review the generated release before distributing it.
 
 ## Uninstall
 
@@ -415,6 +448,8 @@ The uninstaller removes the application, launcher, menu entry, icon, system auto
 | **[Troubleshooting](troubleshooting.md)** | Diagnose installation, autostart, shortcut, clipboard, automatic-paste, GIPHY, graphics, or development failures |
 | **[Product](PRODUCT.md)** | Read the product purpose, intended users, principles, and accessibility goals |
 | **[Design](DESIGN.md)** | Explore the visual system, interface decisions, colors, spacing, and interaction direction |
+| **[Release Process](RELEASE.md)** | Run the beta/stable gates, publish architecture-specific installers, and verify checksums |
+| **[Changelog](CHANGELOG.md)** | Review user-visible changes and the current validation boundary |
 
 > New to Linux desktop terminology? Begin with **[LClip Technical Details](technical_details.md)**. If something is not working, go directly to **[LClip Troubleshooting](troubleshooting.md)**.
 

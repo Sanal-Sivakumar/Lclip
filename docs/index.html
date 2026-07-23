@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LClip - The Ultimate Linux Clipboard & Expression Picker</title>
+    <title>LClip — Clipboard &amp; Expression Picker for Linux</title>
     <meta name="description" content="A private, system-integrated clipboard history and expression picker for Linux.">
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar">
@@ -28,53 +25,57 @@
             <div class="hero-content">
                 <span class="shortcut-badge"><kbd>Super</kbd> + <kbd>.</kbd></span>
                 <h1 class="hero-title">Your clipboard & expressions.<br>One shortcut away.</h1>
-                <p class="hero-subtitle">A private, system-integrated clipboard history and expression picker designed natively for Linux.</p>
+                <p class="hero-subtitle">A local-first, system-integrated clipboard history and expression picker designed for Linux desktops.</p>
                 <div class="hero-actions">
-                    <a href="https://github.com/Sanal-Sivakumar/Lclip#install-on-linux" class="btn primary-btn">Install for Linux</a>
+                    <a href="https://github.com/Sanal-Sivakumar/Lclip#beta-downloads" class="btn primary-btn">Get the beta</a>
                     <a href="https://github.com/Sanal-Sivakumar/Lclip/blob/main/technical_details.md" class="btn secondary-btn">Technical Details</a>
                 </div>
+                <p class="release-note"><strong>1.0.0-beta.1 candidate:</strong> direct x86-64 and ARM64 installers appear only after the tagged build passes. Linux desktop validation remains visible in the release checklist.</p>
             </div>
-            <div class="hero-image-container reveal">
-                <img src="assets/hero_ui.jpg" alt="LClip Hero UI Mockup" class="mockup-img">
-            </div>
+            <figure class="hero-image-container reveal">
+                <img src="assets/hero_ui.jpg" alt="Concept artwork exploring a future LClip visual direction" class="mockup-img">
+                <figcaption>Concept artwork — the current release uses the compact interface documented below.</figcaption>
+            </figure>
         </section>
 
         <section class="features-grid">
             <div class="feature-row reverse reveal">
                 <div class="feature-text">
-                    <h2 class="gradient-text">Refined Glassmorphism.</h2>
-                    <p>Everything in one floating glass pane. We've crafted a premium, highly translucent dark mode that seamlessly blends with your wallpaper.</p>
+                    <h2>Quiet, focused desktop utility.</h2>
+                    <p>LClip keeps the working surface compact: one search field, a clear mode rail, bounded results, and diagnostics that stay in Settings until needed.</p>
                     <ul class="feature-list callout-list">
-                        <li><strong>Clean Interface:</strong> Search bar is decluttered by removing shortcut hints. The LClip logo is now clickable, taking you straight back to your history.</li>
-                        <li><strong>Context Aware:</strong> Clipboard history now displays the exact source application (like VS Code or Firefox) and the precise time you copied it.</li>
-                        <li><strong>Translucent Depth:</strong> A lighter, more translucent backdrop inspired by premium modern OS designs.</li>
+                        <li><strong>Clipboard history:</strong> The latest 10 copied text values are deduplicated, time-stamped, length-limited, and stored only on this device.</li>
+                        <li><strong>Fresh-start behavior:</strong> Every new <kbd>Super</kbd> + <kbd>.</kbd> opening returns to History and clears the previous search.</li>
+                        <li><strong>Desktop-aware window:</strong> A dedicated native drag strip and Xwayland compatibility preserve movement on supported Wayland sessions.</li>
                     </ul>
                 </div>
-                <div class="feature-visual">
-                    <img src="assets/hero_ui.jpg" alt="LClip Clipboard History UI" class="mockup-img small">
-                </div>
+                <figure class="feature-visual">
+                    <img src="assets/hero_ui.jpg" alt="Concept artwork for a clipboard history interface" class="mockup-img small">
+                    <figcaption>Visual direction study, not a literal product screenshot.</figcaption>
+                </figure>
             </div>
 
             <div class="feature-row reveal">
                 <div class="feature-text">
-                    <h2 class="gradient-text">Express yourself faster.</h2>
-                    <p>An extensive, categorized offline library of expressions, completely redesigned for a premium selection experience.</p>
+                    <h2>Expressions without leaving your work.</h2>
+                    <p>A searchable offline library plus optional GIPHY search, designed for keyboard and pointer use.</p>
                     <ul class="feature-list callout-list">
-                        <li><strong>Immersive Grid:</strong> Now featuring exactly 9 emojis per row, with text labels removed for a cleaner, high-density look.</li>
-                        <li><strong>Minimal Navigation:</strong> Tabs (History, Emoji, Symbols, Kaomoji) are now icon-only and spaced elegantly away from the logo.</li>
+                        <li><strong>Offline catalog:</strong> 244 emoji, 60 kaomoji, and 124 symbols are bundled locally with searchable names and categories.</li>
+                        <li><strong>Clear navigation:</strong> Labeled modes cover History, Emoji, Kaomoji, GIFs, and Symbols without hiding routine destinations.</li>
                         <li><strong>Fast Keyboard Workflow:</strong> Search, arrow navigation, and Enter to paste without lifting a finger.</li>
                     </ul>
                 </div>
-                <div class="feature-visual">
-                    <img src="assets/emoji_ui.jpg" alt="LClip Emoji Picker UI" class="mockup-img small">
-                </div>
+                <figure class="feature-visual">
+                    <img src="assets/emoji_ui.jpg" alt="Concept artwork for an emoji picker" class="mockup-img small">
+                    <figcaption>Visual direction study, not a literal product screenshot.</figcaption>
+                </figure>
             </div>
         </section>
 
         <section class="privacy-section reveal">
             <div class="privacy-card">
-                <h2>Privacy & Desktop Integration First</h2>
-                <p>LClip is not a keylogger. It registers one explicit global chord and keeps clipboard history local, bounded, and secure. It degrades gracefully on strict Wayland security policies while attempting the best input bridge (<code>ydotool</code>, <code>wtype</code>, or <code>xdotool</code>).</p>
+                <h2>Privacy &amp; desktop integration first</h2>
+                <p>LClip is not a keylogger. It registers one explicit global chord and keeps clipboard history local and bounded. Automatic paste depends on desktop permissions and an available input bridge (<code>ydotool</code>, <code>wtype</code>, or <code>xdotool</code>); when injection is blocked, the selected value remains safely copied for manual paste.</p>
             </div>
         </section>
     </main>

@@ -261,11 +261,11 @@ The system installer records the checkout's 12-character Git revision in `/opt/l
 ### GIF flow
 
 1. The user enters an optional GIPHY API key in Settings.
-2. The main process requests up to 24 search or trending results over HTTPS.
+2. The main process cancels any older in-flight search, then requests up to 24 search or trending results over HTTPS.
 3. The renderer displays GIPHY-hosted WebP previews.
 4. Selecting a result sends its metadata to the main process.
 5. The main process accepts only HTTPS hosts equal to `giphy.com` or ending in `.giphy.com`.
-6. It downloads the original with a 12-second timeout and a 15 MB limit.
+6. It revalidates redirects and content type, then downloads through a bounded stream with a 12-second timeout. The reader is cancelled immediately when accumulated data exceeds 15 MB.
 7. It writes image, HTML, and URL representations to the clipboard.
 8. It attempts automatic paste using the detected bridge.
 
@@ -409,7 +409,7 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 
 The installer rejects conflicting or unknown options. It must be invoked as the desktop user so `sudo` is used only for system file operations and the GNOME shortcut is written into the correct user's settings.
 
-Before packaging, the installer removes `dist/` so an old unpacked bundle cannot be selected accidentally. After verification and packaging, it terminates the currently resident `/opt/lclip/lclip` process, replaces `/opt/lclip` atomically, writes the build marker, and starts the newly installed process in the current graphical session. This restart is essential because replacing executable files on disk does not rewrite code already loaded into a running Electron process.
+Before packaging, the installer removes `dist/` so an old unpacked bundle cannot be selected accidentally. After verification and packaging, it prepares a complete root-owned bundle at `/opt/lclip.new`, records the build marker, and stops the resident process. The previous installation is moved to `/opt/lclip.rollback` before the staged bundle is activated. If activation or a required system-integration step fails, the error trap restores that previous bundle automatically. The rollback copy is removed only after the installation finishes successfully, then the new resident process starts in the current graphical session.
 
 ## 10. Tests and verification
 
@@ -426,7 +426,7 @@ Before packaging, the installer removes `dist/` so an old unpacked bundle cannot
 - the offline emoji, kaomoji, and symbol catalogs meet their minimum sizes, contain searchable metadata, and do not duplicate values.
 - Wayland sessions choose Xwayland only when it is available and the user has not requested native Wayland.
 
-The current suite contains eleven tests. These are unit tests. They do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. A Linux test matrix is still required for release confidence.
+The current suite contains 23 automated tests covering state, persistence, IPC, GIPHY bounds and cancellation, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. These tests do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. The evidence-bearing Linux matrix in `docs/linux-smoke-test.md` remains required for stable-release confidence.
 
 ## 11. License and copyleft
 

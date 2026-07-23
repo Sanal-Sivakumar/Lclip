@@ -32,8 +32,9 @@ export function addHistoryItem(history, text, now = Date.now()) {
 }
 
 export class StateStore {
-  constructor(path) {
+  constructor(path, { onPersistenceStatus } = {}) {
     this.path = path;
+    this.onPersistenceStatus = onPersistenceStatus;
     this.state = {
       history: [],
       settings: {
@@ -44,6 +45,12 @@ export class StateStore {
       }
     };
     this.writeQueue = Promise.resolve();
+    this.pendingWrites = 0;
+    this.persistenceStatus = {
+      state: "saved",
+      message: "Changes are saved locally",
+      lastSavedAt: null
+    };
   }
 
   async load() {
@@ -65,12 +72,67 @@ export class StateStore {
     return structuredClone(this.state);
   }
 
-  update(mutator) {
+  persistenceSnapshot() {
+    return structuredClone({ ...this.persistenceStatus, pending: this.pendingWrites });
+  }
+
+  get hasPendingWrites() {
+    return this.pendingWrites > 0;
+  }
+
+  #emitPersistenceStatus() {
+    this.onPersistenceStatus?.(this.persistenceSnapshot());
+  }
+
+  #queuePersist(snapshot) {
+    this.pendingWrites += 1;
+    const write = this.writeQueue
+      .then(() => this.persist(snapshot))
+      .then(() => {
+        this.pendingWrites -= 1;
+        this.persistenceStatus = {
+          state: "saved",
+          message: "Changes are saved locally",
+          lastSavedAt: Date.now()
+        };
+        this.#emitPersistenceStatus();
+        return snapshot;
+      }, error => {
+        this.pendingWrites -= 1;
+        this.persistenceStatus = {
+          state: "error",
+          message: String(error?.message || "Could not save local data").slice(0, 220),
+          lastSavedAt: this.persistenceStatus.lastSavedAt
+        };
+        this.#emitPersistenceStatus();
+        throw error;
+      });
+    this.writeQueue = write.catch(() => {});
+    return write;
+  }
+
+  #applyUpdate(mutator) {
     mutator(this.state);
     this.state.history = normalizeHistory(this.state.history);
     const snapshot = this.snapshot();
-    this.writeQueue = this.writeQueue.then(() => this.persist(snapshot)).catch(() => {});
-    return snapshot;
+    return { snapshot, write: this.#queuePersist(snapshot) };
+  }
+
+  update(mutator) {
+    const operation = this.#applyUpdate(mutator);
+    operation.write.catch(() => {});
+    return operation.snapshot;
+  }
+
+  async updateAndPersist(mutator) {
+    const operation = this.#applyUpdate(mutator);
+    await operation.write;
+    return operation.snapshot;
+  }
+
+  async flush() {
+    await this.writeQueue;
+    if (this.persistenceStatus.state === "error") throw new Error(this.persistenceStatus.message);
   }
 
   async persist(snapshot = this.snapshot()) {

@@ -1,6 +1,6 @@
 {
   "name": "lclip",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.1",
   "description": "A system-integrated clipboard history and expression picker for Linux",
   "main": "src/main/main.mjs",
   "type": "module",
@@ -13,9 +13,11 @@
   "scripts": {
     "start": "electron . --show",
     "dev": "electron . --show --dev",
-    "check": "node --check src/main/main.mjs && node --check src/main/store.mjs && node --check src/main/paste-bridge.mjs && node --check src/main/window-backend.mjs && node --check src/preload/preload.cjs && node --check src/renderer/app.js",
+    "check": "node --check src/main/main.mjs && node --check src/main/store.mjs && node --check src/main/paste-bridge.mjs && node --check src/main/window-backend.mjs && node --check src/main/giphy.mjs && node --check src/main/ipc-handlers.mjs && node --check src/main/shortcut-status.mjs && node --check src/preload/preload.cjs && node --check src/renderer/app.js && node --check scripts/configure-gnome-shortcut.mjs && node --check scripts/verify-release.mjs && node --check docs/js/animations.js && bash -n scripts/*.sh",
     "test": "node --test tests/*.test.mjs",
     "verify": "npm run check && npm test",
+    "verify:release": "node scripts/verify-release.mjs --allow-untagged",
+    "smoke:linux": "bash scripts/smoke-linux.sh",
     "pack:linux": "electron-builder --linux dir",
     "dist:linux": "electron-builder --linux AppImage deb rpm"
   },

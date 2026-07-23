@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  linux-release:
+  verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,26 +26,103 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify source
-        run: npm run verify
+      - name: Validate source, tests, audit, and tag
+        run: |
+          npm run verify
+          npm audit --audit-level=high
+          node scripts/verify-release.mjs --allow-untagged
 
-      - name: Build AppImage and Debian package
-        run: npx electron-builder --linux AppImage deb --x64 --publish never
+  build:
+    needs: verify
+    name: Build Linux ${{ matrix.arch }} installers
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            builder_flag: --x64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            builder_flag: --arm64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Upload workflow artifacts
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build AppImage, Debian, and RPM installers
+        run: npx electron-builder --linux AppImage deb rpm ${{ matrix.builder_flag }} --publish never
+
+      - name: Upload architecture-specific installers
         uses: actions/upload-artifact@v4
         with:
-          name: lclip-linux-installers
+          name: lclip-linux-${{ matrix.arch }}-installers
           path: |
             dist/*.AppImage
             dist/*.deb
+            dist/*.rpm
           if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lclip-linux-*-installers
+          path: release/downloads
+
+      - name: Create stable asset names and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release/publish
+          for arch in x64 arm64; do
+            source_dir="release/downloads/lclip-linux-${arch}-installers"
+            for extension in AppImage deb rpm; do
+              source_file="$(find "${source_dir}" -type f -name "*.${extension}" -print -quit)"
+              if [[ -z "${source_file}" ]]; then
+                echo "Missing ${extension} installer for ${arch}" >&2
+                exit 1
+              fi
+              cp "${source_file}" "release/publish/LClip-linux-${arch}.${extension}"
+            done
+          done
+          (cd release/publish && sha256sum LClip-* > SHA256SUMS)
+
+      - name: Attest release artifacts
+        uses: actions/attest@v4
+        with:
+          subject-path: release/publish/*
 
       - name: Publish tagged GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.AppImage
-            dist/*.deb
+          files: release/publish/*
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            Automated Linux beta/release artifacts for x86-64 and ARM64.
+
+            Verify the selected file against `SHA256SUMS`. Automated builds do not replace the real GNOME, KDE, Wayland, X11, and ARM64 checks tracked in `docs/linux-smoke-test.md`.

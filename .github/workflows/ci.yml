@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  verify-and-package:
+  verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,13 +29,44 @@ jobs:
       - name: Run verification
         run: npm run verify
 
-      - name: Build unpacked Linux application
-        run: npm run pack:linux
+      - name: Audit production dependency graph
+        run: npm audit --audit-level=high
 
-      - name: Upload Linux build
+  package:
+    needs: verify
+    name: Package Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            builder_flag: --x64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            builder_flag: --arm64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build native unpacked application
+        run: npx electron-builder --linux dir ${{ matrix.builder_flag }} --publish never
+
+      - name: Upload unpacked application
         uses: actions/upload-artifact@v4
         with:
-          name: lclip-linux-x64
-          path: dist/linux-unpacked/
+          name: lclip-linux-${{ matrix.arch }}
+          path: dist/linux*-unpacked/
           if-no-files-found: error
           retention-days: 14
