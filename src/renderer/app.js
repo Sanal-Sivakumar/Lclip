@@ -200,7 +200,9 @@ function renderHistory() {
     row.onclick = () => activateValue(item.text);
     const number = element("span", "history-index", String(index + 1));
     const copy = element("span", "history-copy");
-    copy.append(element("strong", "", item.text.replace(/\s+/g, " ")), element("small", "", `${formatAge(item.createdAt)} · ${item.text.length} characters`));
+    const details = element("span", "history-details");
+    details.append(element("small", "history-time", formatAge(item.createdAt)), element("small", "history-source", item.source || "Source unavailable"));
+    copy.append(element("strong", "", item.text.replace(/\s+/g, " ")), details);
     const remove = element("button", "remove-item", "×");
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove clipboard item ${index + 1}`);

@@ -161,9 +161,12 @@ button { color: inherit; }
 .history-row.selected { box-shadow: inset 0 0 0 1px oklch(0.75 0.08 230 / 0.32); }
 .history-row:active { transform: scale(0.994); }
 .history-index { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 8px; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 700; }
-.history-copy { min-width: 0; }
+.history-copy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; min-width: 0; }
 .history-copy strong { display: block; overflow: hidden; color: var(--ink); font-size: 12px; font-weight: 520; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
-.history-copy small { display: block; margin-top: 4px; color: var(--dim); font-size: 10px; }
+.history-details { display: grid; justify-items: end; gap: 3px; max-width: 135px; min-width: 0; }
+.history-details small { display: block; overflow: hidden; max-width: 100%; color: var(--dim); font-size: 9px; line-height: 1.2; text-align: end; text-overflow: ellipsis; white-space: nowrap; }
+.history-details .history-time { color: var(--muted); font-weight: 620; }
+.history-details .history-source { color: var(--primary); }
 .remove-item { width: 44px; min-height: 58px; border: 0; border-radius: 9px; background: transparent; color: var(--dim); cursor: pointer; opacity: 0.58; }
 .remove-item:focus-visible { opacity: 1; }
 .remove-item:hover { color: var(--danger); background: oklch(0.68 0.18 28 / 0.12); }
