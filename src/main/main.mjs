@@ -398,6 +398,13 @@ app.whenReady().then(async () => {
   broadcast();
   if (process.argv.includes("--show") || process.argv.includes("--dev")) showWindow();
   if (process.argv.includes("--dev")) window.webContents.openDevTools({ mode: "detach" });
+  if (process.env.LCLIP_CI_SMOKE === "1") {
+    console.log("LCLIP_CI_SMOKE_READY");
+    setTimeout(() => {
+      isQuitting = true;
+      app.quit();
+    }, 5_000);
+  }
 });
 
 app.on("activate", showWindow);

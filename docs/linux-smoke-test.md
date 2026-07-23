@@ -6,8 +6,8 @@ LClip separates release-blocking automation from compositor-specific observation
 
 | Environment | Build | Runtime launch | Release formats | Enforcement |
 | --- | --- | --- | --- | --- |
-| Automated Linux x86-64 | Native `ubuntu-24.04` runner | 12-second Xvfb residency check | AppImage, deb, rpm, tar.gz | CI-enforced |
-| Automated Linux ARM64 | Native `ubuntu-24.04-arm` runner | 12-second Xvfb residency check | AppImage, deb, rpm, tar.gz | CI-enforced |
+| Automated Linux x86-64 | Native `ubuntu-24.04` runner | Readiness marker, five-second Xvfb residency, graceful shutdown | AppImage, deb, rpm, tar.gz | CI-enforced |
+| Automated Linux ARM64 | Native `ubuntu-24.04-arm` runner | Readiness marker, five-second Xvfb residency, graceful shutdown | AppImage, deb, rpm, tar.gz | CI-enforced |
 
 A stable tag cannot publish until source verification, dependency audit, both native builds, both runtime launch checks, canonical asset assembly, `SHA256SUMS`, and provenance attestation complete.
 

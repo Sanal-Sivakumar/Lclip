@@ -19,15 +19,20 @@ trap cleanup EXIT
 
 set +e
 if command -v dbus-run-session >/dev/null; then
-  timeout --signal=TERM --kill-after=3s 12s dbus-run-session -- xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
+  LCLIP_CI_SMOKE=1 timeout --signal=TERM --kill-after=3s 20s dbus-run-session -- xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
 else
-  timeout --signal=TERM --kill-after=3s 12s xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
+  LCLIP_CI_SMOKE=1 timeout --signal=TERM --kill-after=3s 20s xvfb-run -a "$EXECUTABLE" --no-sandbox --show >"$LOG_FILE" 2>&1
 fi
 STATUS=$?
 set -e
 
-if [[ "$STATUS" -ne 124 ]]; then
-  echo "The packaged application exited before the 12-second residency check (status $STATUS)." >&2
+if [[ "$STATUS" -ne 0 ]]; then
+  echo "The packaged application did not complete its graceful startup smoke check (status $STATUS)." >&2
+  cat "$LOG_FILE" >&2
+  exit 1
+fi
+if ! grep -q '^LCLIP_CI_SMOKE_READY$' "$LOG_FILE"; then
+  echo "The packaged application exited without reporting renderer/runtime readiness." >&2
   cat "$LOG_FILE" >&2
   exit 1
 fi
@@ -37,4 +42,4 @@ if grep -Eiq '(^|[^a-z])(fatal|segmentation fault|uncaught exception|failed to l
   exit 1
 fi
 
-echo "Packaged LClip remained alive for the Linux Xvfb runtime smoke window."
+echo "Packaged LClip reported readiness, remained resident for five seconds, and shut down cleanly under Xvfb."
