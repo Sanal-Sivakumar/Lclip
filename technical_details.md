@@ -241,7 +241,7 @@ The system installer records the checkout's 12-character Git revision in `/opt/l
 1. Electron reads text from the standard clipboard.
 2. Blank or unchanged text is ignored.
 3. Text longer than 50,000 characters is truncated.
-4. LClip records the capture time and, where the desktop exposes it, the active X11/Xwayland window class as the copy source.
+4. LClip records the capture time for each history entry.
 5. A duplicate is removed from its old position.
 5. The new entry is placed first.
 6. Entries beyond number 10 are discarded.
@@ -329,7 +329,7 @@ During activation, LClip attempts each candidate until one exits successfully. T
 
 The JSON state contains:
 
-- `history`: up to 10 objects containing an ID, text, creation time, and a best-effort source label;
+- `history`: up to 10 objects containing an ID, text, and creation time;
 - `captureEnabled`: whether new clipboard text is collected;
 - `autostartEnabled`: the UI's autostart setting;
 - `giphyApiKey`: the optional API key;
@@ -452,7 +452,6 @@ Authoritative references: [GNU GPL licenses](https://www.gnu.org/licenses/) and 
 ## 12. Known boundaries
 
 - Text history only; copied images and files are not retained as history entries.
-- GNOME Wayland does not expose the active source application to normal applications. LClip labels those entries as `Source unavailable on Wayland` rather than guessing; X11/Xwayland source labels are available only when `xdotool` can read the active window class.
 - A maximum of 10 entries is intentional.
 - The shortcut is fixed to `Super + .`.
 - Automatic paste depends on an external bridge, its service/device permissions, and desktop security policy.

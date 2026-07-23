@@ -2,7 +2,6 @@ import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeIma
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { addHistoryItem, StateStore } from "./store.mjs";
-import { detectClipboardSource } from "./clipboard-source.mjs";
 import { detectPasteBridge, pasteWithBridge } from "./paste-bridge.mjs";
 import { selectWindowBackend } from "./window-backend.mjs";
 import { downloadGiphyAsset, normalizeGiphyResults, readGiphySearchResponse, validateGiphyUrl } from "./giphy.mjs";
@@ -30,7 +29,6 @@ let monitor;
 let bridge = { id: "unavailable", label: "Checking paste support", automatic: false };
 let shortcutRegistered = false;
 let lastClipboard = "";
-let captureInProgress = false;
 let isQuitting = false;
 let rendererReady = false;
 let pendingShow = false;
@@ -209,19 +207,13 @@ function registerShortcut() {
 function startClipboardMonitor() {
   clearInterval(monitor);
   lastClipboard = clipboard.readText("clipboard");
-  monitor = setInterval(async () => {
-    if (!store.state.settings.captureEnabled || captureInProgress) return;
+  monitor = setInterval(() => {
+    if (!store.state.settings.captureEnabled) return;
     const text = clipboard.readText("clipboard");
     if (!text.trim() || text === lastClipboard) return;
     lastClipboard = text;
-    captureInProgress = true;
-    try {
-      const source = await detectClipboardSource();
-      store.update(state => { state.history = addHistoryItem(state.history, text, Date.now(), source); });
-      broadcast();
-    } finally {
-      captureInProgress = false;
-    }
+    store.update(state => { state.history = addHistoryItem(state.history, text); });
+    broadcast();
   }, 350);
   monitor.unref?.();
 }
@@ -245,7 +237,7 @@ async function activateText(text) {
   if (!value.trim()) return { ok: false, pasted: false };
   clipboard.writeText(value);
   lastClipboard = value;
-  store.update(state => { state.history = addHistoryItem(state.history, value, Date.now(), "LClip"); });
+  store.update(state => { state.history = addHistoryItem(state.history, value); });
   const pasted = await pasteIntoPreviousApp(150);
   if (!pasted && Notification.isSupported()) {
     new Notification({ title: "LClip copied the item", body: "Automatic paste is unavailable. Focus the target app, then press Ctrl+V." }).show();

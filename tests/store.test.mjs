@@ -14,12 +14,11 @@ test("clipboard history is bounded to ten items", () => {
 });
 
 test("copying the same text moves it to the front without duplication", () => {
-  let history = addHistoryItem([], "alpha", 1, "Firefox");
-  history = addHistoryItem(history, "beta", 2, "Code");
-  history = addHistoryItem(history, "alpha", 3, "Firefox");
+  let history = addHistoryItem([], "alpha", 1);
+  history = addHistoryItem(history, "beta", 2);
+  history = addHistoryItem(history, "alpha", 3);
   assert.deepEqual(history.map(item => item.text), ["alpha", "beta"]);
   assert.equal(history[0].createdAt, 3);
-  assert.equal(history[0].source, "Firefox");
 });
 
 test("invalid and blank persisted values are discarded", () => {

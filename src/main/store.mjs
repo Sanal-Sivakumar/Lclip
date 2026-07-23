@@ -15,19 +15,18 @@ export function normalizeHistory(history) {
     clean.push({
       id: typeof item.id === "string" ? item.id : randomUUID(),
       text,
-      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now(),
-      source: typeof item.source === "string" && item.source.trim() ? item.source.trim().slice(0, 80) : "Source unavailable"
+      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now()
     });
     if (clean.length === MAX_HISTORY) break;
   }
   return clean;
 }
 
-export function addHistoryItem(history, text, now = Date.now(), source = "Source unavailable") {
+export function addHistoryItem(history, text, now = Date.now()) {
   if (typeof text !== "string" || !text.trim()) return normalizeHistory(history);
   const value = text.slice(0, 50_000);
   return normalizeHistory([
-    { id: randomUUID(), text: value, createdAt: now, source: typeof source === "string" && source.trim() ? source.trim().slice(0, 80) : "Source unavailable" },
+    { id: randomUUID(), text: value, createdAt: now },
     ...normalizeHistory(history).filter(item => item.text !== value)
   ]);
 }

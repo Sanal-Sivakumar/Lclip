@@ -70,9 +70,8 @@ h1 { max-width: 13ch; font-size: clamp(3.25rem, 6vw, 5.5rem); line-height: .99; 
 .preview-history li:first-child { outline: 1px solid rgba(139,200,246,.42); background: rgba(139,200,246,.06); }
 .preview-history b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: rgba(139,200,246,.15); color: var(--blue); font-size: 10px; }
 .preview-history strong { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.preview-history span { display: grid; justify-items: end; gap: 2px; font-size: 9px; font-style: normal; }
+.preview-history span { display: grid; justify-items: end; gap: 2px; font-size: 10px; font-style: normal; }
 .preview-history em { color: var(--muted); font-style: normal; }
-.preview-history i { max-width: 90px; overflow: hidden; color: var(--blue); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 
 .install-section, .workflow-section, .support-section { border-top: 1px solid var(--line); padding: 112px 0; }
 .install-section { display: grid; grid-template-columns: minmax(0,1fr) minmax(340px,.8fr); gap: 30px 64px; }

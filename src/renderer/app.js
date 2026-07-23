@@ -201,7 +201,7 @@ function renderHistory() {
     const number = element("span", "history-index", String(index + 1));
     const copy = element("span", "history-copy");
     const details = element("span", "history-details");
-    details.append(element("small", "history-time", formatAge(item.createdAt)), element("small", "history-source", item.source || "Source unavailable"));
+    details.append(element("small", "history-time", formatAge(item.createdAt)));
     copy.append(element("strong", "", item.text.replace(/\s+/g, " ")), details);
     const remove = element("button", "remove-item", "×");
     remove.type = "button";
