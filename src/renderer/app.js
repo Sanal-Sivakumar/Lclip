@@ -229,7 +229,7 @@ function renderGlyphs(source, isKaomoji) {
     configureStaticResults();
     return renderEmpty(results, "No characters found", "Try another word or choose a different category.", "⌕");
   }
-  const grid = element("div", `glyph-grid${isKaomoji ? " kaomoji-grid" : ""}`);
+  const grid = element("div", `glyph-grid${state.mode === "emoji" ? " emojis-grid" : ""}${isKaomoji ? " kaomoji-grid" : ""}`);
   configureOptionList(grid);
   items.forEach((item, index) => {
     const button = element("button", "glyph-item");
@@ -239,7 +239,8 @@ function renderGlyphs(source, isKaomoji) {
     button.setAttribute("role", "option");
     button.setAttribute("aria-label", `Paste ${item.name}: ${item.value}`);
     button.onclick = () => activateValue(item.value);
-    button.append(element("strong", "", item.value), element("small", "", item.name));
+    button.append(element("strong", "", item.value));
+    if (state.mode !== "emoji") button.append(element("small", "", item.name));
     grid.append(button);
   });
   results.append(grid);

@@ -16,13 +16,13 @@
         <strong>LClip</strong>
       </div>
       <nav class="mode-list">
-        <button class="mode-button active" data-mode="clipboard" aria-label="Clipboard history" aria-pressed="true"><span aria-hidden="true">▣</span><small>History</small></button>
-        <button class="mode-button" data-mode="emoji" aria-label="Emoji" aria-pressed="false"><span aria-hidden="true">☺</span><small>Emoji</small></button>
-        <button class="mode-button" data-mode="kaomoji" aria-label="Kaomoji" aria-pressed="false"><span aria-hidden="true">ツ</span><small>Kaomoji</small></button>
-        <button class="mode-button" data-mode="gifs" aria-label="GIFs" aria-pressed="false"><span aria-hidden="true">GIF</span><small>GIFs</small></button>
-        <button class="mode-button" data-mode="symbols" aria-label="Special characters" aria-pressed="false"><span aria-hidden="true">Ω</span><small>Symbols</small></button>
+        <button class="mode-button active" data-mode="clipboard" aria-label="Clipboard history" title="Clipboard history" aria-pressed="true"><span aria-hidden="true">▣</span></button>
+        <button class="mode-button" data-mode="emoji" aria-label="Emoji" title="Emoji" aria-pressed="false"><span aria-hidden="true">☺</span></button>
+        <button class="mode-button" data-mode="kaomoji" aria-label="Kaomoji" title="Kaomoji" aria-pressed="false"><span aria-hidden="true">ツ</span></button>
+        <button class="mode-button" data-mode="gifs" aria-label="GIFs" title="GIFs" aria-pressed="false"><span aria-hidden="true">GIF</span></button>
+        <button class="mode-button" data-mode="symbols" aria-label="Special characters" title="Special characters" aria-pressed="false"><span aria-hidden="true">Ω</span></button>
       </nav>
-      <button class="rail-action" id="settingsButton" aria-label="Open LClip settings"><span aria-hidden="true">⚙</span><small>Settings</small></button>
+      <button class="rail-action" id="settingsButton" aria-label="Open LClip settings" title="Settings"><span aria-hidden="true">⚙</span></button>
     </aside>
 
     <main class="picker">
@@ -32,7 +32,7 @@
           <button class="window-close" id="closeButton" aria-label="Close LClip">×</button>
         </div>
         <div class="search-row">
-          <div class="search-wrap">
+          <div class="search-box">
             <span aria-hidden="true">⌕</span>
             <input id="searchInput" type="search" role="combobox" aria-autocomplete="list" aria-controls="lclip-options" aria-expanded="true" autocomplete="off" spellcheck="false" placeholder="Search clipboard history" aria-label="Search LClip">
             <kbd>Super&nbsp;+&nbsp;.</kbd>
