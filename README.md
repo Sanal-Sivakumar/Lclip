@@ -450,6 +450,7 @@ The uninstaller removes the application, launcher, menu entry, icon, system auto
 | **[Design](DESIGN.md)** | Explore the visual system, interface decisions, colors, spacing, and interaction direction |
 | **[Release Process](RELEASE.md)** | Run the beta/stable gates, publish architecture-specific installers, and verify checksums |
 | **[Changelog](CHANGELOG.md)** | Review user-visible changes and the current validation boundary |
+| **[History Rewrite](docs/history-rewrite.md)** | Coordinate the one-time `.venv` cleanup without overwriting new remote work or reintroducing old objects |
 
 > New to Linux desktop terminology? Begin with **[LClip Technical Details](technical_details.md)**. If something is not working, go directly to **[LClip Troubleshooting](troubleshooting.md)**.
 

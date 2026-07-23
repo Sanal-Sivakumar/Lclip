@@ -4,13 +4,14 @@ LClip uses tags as the only publication trigger. A successful source build is ne
 
 ## Beta gate
 
-1. Set the same prerelease version in `package.json`, `package-lock.json`, and `CHANGELOG.md`.
-2. Run `npm ci`, `npm run verify`, `npm audit --audit-level=high`, and `npm run verify:release`.
-3. Exercise `npm run smoke:linux` and record the tested machines in `docs/linux-smoke-test.md`. Pending rows are allowed for beta tags and must be described in the release notes.
-4. Commit the exact source to release, then create an annotated tag such as `v1.0.0-beta.1`.
-5. Push the branch and that one tag. Never retag a published version.
-6. Confirm both native GitHub jobs produced x86-64 and ARM64 AppImage, Debian, and RPM files.
-7. Download an installer for each architecture, verify it against `SHA256SUMS`, and review the generated build attestation before promoting the release.
+1. Complete the one-time remote coordination in `docs/history-rewrite.md`; do not tag the old history.
+2. Set the same prerelease version in `package.json`, `package-lock.json`, and `CHANGELOG.md`.
+3. Run `npm ci`, `npm run verify`, `npm audit --audit-level=high`, and `npm run verify:release`.
+4. Exercise `npm run smoke:linux` and record the tested machines in `docs/linux-smoke-test.md`. Pending rows are allowed for beta tags and must be described in the release notes.
+5. Commit the exact source to release, then create an annotated tag such as `v1.0.0-beta.1`.
+6. Push the branch and that one tag. Never retag a published version.
+7. Confirm both native GitHub jobs produced x86-64 and ARM64 AppImage, Debian, and RPM files.
+8. Download an installer for each architecture, verify it against `SHA256SUMS`, and review the generated build attestation before promoting the release.
 
 ```bash
 npm ci
