@@ -60,8 +60,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build AppImage, Debian, and RPM installers
-        run: npx electron-builder --linux AppImage deb rpm ${{ matrix.builder_flag }} --publish never
+      - name: Build AppImage, Debian, RPM, and portable archives
+        run: npx electron-builder --linux AppImage deb rpm tar.gz ${{ matrix.builder_flag }} --publish never
+
+      - name: Install headless runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb dbus-x11
+
+      - name: Launch packaged application under Xvfb
+        shell: bash
+        run: |
+          bundle="$(find dist -maxdepth 1 -type d -name 'linux*-unpacked' -print -quit)"
+          bash scripts/smoke-packaged-linux.sh "$bundle"
 
       - name: Upload architecture-specific installers
         uses: actions/upload-artifact@v4
@@ -71,6 +82,7 @@ jobs:
             dist/*.AppImage
             dist/*.deb
             dist/*.rpm
+            dist/*.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -100,7 +112,7 @@ jobs:
           mkdir -p release/publish
           for arch in x64 arm64; do
             source_dir="release/downloads/lclip-linux-${arch}-installers"
-            for extension in AppImage deb rpm; do
+            for extension in AppImage deb rpm tar.gz; do
               source_file="$(find "${source_dir}" -type f -name "*.${extension}" -print -quit)"
               if [[ -z "${source_file}" ]]; then
                 echo "Missing ${extension} installer for ${arch}" >&2
@@ -109,7 +121,11 @@ jobs:
               cp "${source_file}" "release/publish/LClip-linux-${arch}.${extension}"
             done
           done
-          (cd release/publish && sha256sum LClip-* > SHA256SUMS)
+          cp assets/io.lclip.LClip.svg release/publish/LClip.svg
+          cp scripts/install-release.sh release/publish/install-lclip.sh
+          cp scripts/uninstall-user.sh release/publish/uninstall-lclip.sh
+          chmod 0755 release/publish/install-lclip.sh release/publish/uninstall-lclip.sh
+          (cd release/publish && sha256sum LClip-* install-lclip.sh uninstall-lclip.sh > SHA256SUMS)
 
       - name: Attest release artifacts
         uses: actions/attest@v4
@@ -123,6 +139,8 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            Automated Linux beta/release artifacts for x86-64 and ARM64.
+            Stable LClip installers for Linux x86-64 and ARM64.
 
-            Verify the selected file against `SHA256SUMS`. Automated builds do not replace the real GNOME, KDE, Wayland, X11, and ARM64 checks tracked in `docs/linux-smoke-test.md`.
+            The no-root `install-lclip.sh` path uses the portable archive and does not require Node.js, npm, or FUSE. AppImage, Debian, RPM, and tar.gz files are also available for manual installation.
+
+            Verify downloads against `SHA256SUMS`. Both architectures are built natively and the packaged runtime is launched under Xvfb before publication. Desktop-specific shortcut and automatic-paste behavior still follows the support policy in `docs/linux-smoke-test.md`.

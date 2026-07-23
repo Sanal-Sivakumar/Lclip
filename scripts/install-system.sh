@@ -240,7 +240,6 @@ Terminal=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 X-KDE-autostart-after=panel
-OnlyShowIn=GNOME;KDE;XFCE;X-Cinnamon;MATE;LXQt;Unity;
 EOF
 
 backup_system_integrations

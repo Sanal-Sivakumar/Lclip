@@ -218,6 +218,56 @@ kbd {
     display: block;
 }
 
+/* Downloads */
+.download-section {
+    max-width: 1040px;
+    margin: 2rem auto 5rem;
+    scroll-margin-top: 92px;
+    padding: clamp(1.5rem, 4vw, 3rem);
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: start;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: oklch(0.17 0.016 235 / 0.68);
+}
+
+.download-copy p { max-width: 62ch; }
+.install-command {
+    display: grid;
+    gap: 0.5rem;
+    margin: 1.75rem 0;
+    padding: 1rem;
+    border-radius: 10px;
+    background: oklch(0.08 0.008 240 / 0.84);
+}
+.install-command code { color: var(--accent-mint); font-size: 0.82rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.download-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.text-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--text-primary); text-underline-offset: 4px; }
+.download-formats { border-top: 1px solid var(--border-color); }
+.download-row {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.download-row > div { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.download-row span, .support-note { color: var(--text-secondary); font-size: 0.86rem; }
+.download-row nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.download-row a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 0.8rem;
+    border-radius: 10px;
+    color: var(--text-primary);
+    background: var(--surface-color);
+    text-decoration: none;
+}
+.download-row a:hover { background: var(--surface-hover); }
+.support-note { margin: 1.25rem 0 0; line-height: 1.6; }
+
 /* Features Grid */
 .features-grid {
     padding: 5rem 2rem;
@@ -356,6 +406,11 @@ footer {
         flex-direction: column;
         width: 100%;
         max-width: 300px;
+    }
+
+    .download-section {
+        margin-inline: 1rem;
+        grid-template-columns: 1fr;
     }
 }
 

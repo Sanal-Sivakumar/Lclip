@@ -11,6 +11,7 @@ test("autostart entries quote executable paths and preserve the hidden launch mo
   const entry = buildAutostartEntry({ enabled: true, executable: "/opt/lclip/lclip" });
   assert.match(entry, /Exec="\/opt\/lclip\/lclip" --hidden/);
   assert.match(entry, /Hidden=false/);
+  assert.doesNotMatch(entry, /OnlyShowIn/, "XDG autostart must not exclude otherwise compatible desktops");
   assert.match(buildAutostartEntry({ enabled: false, executable: "/unused" }), /Hidden=true/);
 });
 

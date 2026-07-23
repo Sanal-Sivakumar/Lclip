@@ -5,7 +5,7 @@
   <p>A local-first, system-integrated clipboard history and expression picker for Linux.</p>
   <p>
     <a href="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml"><img src="https://github.com/Sanal-Sivakumar/Lclip/actions/workflows/ci.yml/badge.svg" alt="Verify LClip status"></a>
-    <img src="https://img.shields.io/badge/release-1.0.0--beta.1-c1e8f8?style=flat-square" alt="Current source version 1.0.0 beta 1">
+    <a href="https://github.com/Sanal-Sivakumar/Lclip/releases/latest"><img src="https://img.shields.io/github/v/release/Sanal-Sivakumar/Lclip?display_name=tag&sort=semver&style=flat-square&color=c1e8f8" alt="Latest stable LClip release"></a>
     <img src="https://img.shields.io/badge/Linux-GNOME%20%7C%20KDE-85bed8?style=flat-square&logo=linux&logoColor=white" alt="Linux GNOME and KDE">
     <img src="https://img.shields.io/badge/Wayland%20%2B%20X11-28404c?style=flat-square" alt="Wayland and X11">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-c1e8f8?style=flat-square" alt="GNU GPL version 3 license"></a>
@@ -22,15 +22,16 @@ After its per-user login setting has been enabled, LClip can stay ready after gr
 > [!IMPORTANT]
 > LClip never replaces normal `Ctrl+C` or `Ctrl+V`. It registers only `Super + .`; it is not a keylogger and does not receive unrelated keystrokes.
 
-**[Beta downloads](#beta-downloads)** · **[Install from source](#install-on-linux)** · **[Read the technical guide](technical_details.md)** · **[Open troubleshooting](troubleshooting.md)**
+**[Download stable LClip](#download-and-install)** · **[First run](#first-run)** · **[Build from source](#build-and-integrate-from-source)** · **[Troubleshooting](troubleshooting.md)**
 
 ## Contents
 
 - [Features](#features)
 - [How LClip behaves](#how-lclip-behaves)
 - [Linux support](#linux-support)
-- [Beta downloads](#beta-downloads)
-- [Install on Linux](#install-on-linux)
+- [Download and install](#download-and-install)
+- [First run](#first-run)
+- [Build and integrate from source](#build-and-integrate-from-source)
 - [Global shortcut integration](#global-shortcut-integration)
 - [Automatic paste on Wayland](#automatic-paste-on-wayland)
 - [Using LClip](#using-lclip)
@@ -115,24 +116,50 @@ LClip is designed for GNOME and KDE Plasma in Wayland or X11 sessions. On a Wayl
 
 This repository is developed and packaged from macOS as well as Linux, but the operating-system integration must be verified on a real Linux graphical session. A successful build on macOS does not prove that a particular GNOME or KDE configuration will permit synthetic paste.
 
-Recommended environment:
+Supported environment:
 
 - 64-bit Linux on x86-64 or ARM64
-- GNOME or KDE Plasma
-- Wayland or X11 graphical session
-- Node.js 22.12.0 or newer and npm for building from source
-- `sudo` for the system-wide installation step
+- a current glibc-based distribution
+- GNOME, KDE Plasma, or a compatible X11/Wayland desktop
+- a graphical user session
 
-## Beta downloads
+The stable prebuilt release does **not** require Node.js, npm, root access, or FUSE when installed with the portable installer. Node.js and `sudo` are needed only for the advanced source/system integration path.
 
-The repository is prepared for `v1.0.0-beta.1`, but that tag is not treated as published merely because the source version exists. Once a maintainer pushes the annotated tag and both native architecture jobs pass, the GitHub release provides these direct installer paths:
+## Download and install
 
-| Architecture | AppImage | Distribution packages |
-| --- | --- | --- |
-| x86-64 | [Download AppImage](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-x64.AppImage) | [Debian](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-x64.deb) · [RPM](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-x64.rpm) |
-| ARM64 | [Download AppImage](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-arm64.AppImage) | [Debian](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-arm64.deb) · [RPM](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/LClip-linux-arm64.rpm) |
+### Recommended: no-root portable installer
 
-The same release includes [`SHA256SUMS`](https://github.com/Sanal-Sivakumar/Lclip/releases/download/v1.0.0-beta.1/SHA256SUMS). Check the [Releases page](https://github.com/Sanal-Sivakumar/Lclip/releases) first: if the tag is absent, these versioned links intentionally do not masquerade as a working download. Beta means the automated checks passed while some real-desktop rows in [`docs/linux-smoke-test.md`](docs/linux-smoke-test.md) may remain pending.
+This is the smoothest option across Ubuntu, Debian, Fedora, openSUSE, Arch, Mint, Pop!_OS, elementary OS, and other current 64-bit glibc distributions. It detects x86-64 or ARM64, downloads the matching portable archive, verifies `SHA256SUMS`, installs below `~/.local`, creates the application-menu and login entries, and restores the previous user installation if activation fails.
+
+```bash
+mkdir -p ~/Downloads/lclip-install
+cd ~/Downloads/lclip-install
+curl -fLO https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/install-lclip.sh
+less install-lclip.sh
+chmod +x install-lclip.sh
+./install-lclip.sh
+```
+
+If `curl` is unavailable, use:
+
+```bash
+wget https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/install-lclip.sh
+chmod +x install-lclip.sh
+./install-lclip.sh
+```
+
+The installer requires only `curl` or `wget`, `tar`, and `sha256sum`. Run `./install-lclip.sh --help` for a custom prefix, a specific version, or installation without login autostart.
+
+### Direct stable downloads
+
+Check your architecture with `uname -m`: `x86_64` uses x64 downloads; `aarch64` or `arm64` uses ARM64 downloads.
+
+| Architecture | Portable tar.gz | AppImage | Distribution packages |
+| --- | --- | --- | --- |
+| x86-64 | [Portable](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-x64.tar.gz) | [AppImage](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-x64.AppImage) | [Debian/Ubuntu](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-x64.deb) · [Fedora/RHEL/openSUSE](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-x64.rpm) |
+| ARM64 | [Portable](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-arm64.tar.gz) | [AppImage](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-arm64.AppImage) | [Debian/Ubuntu](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-arm64.deb) · [Fedora/RHEL/openSUSE](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/LClip-linux-arm64.rpm) |
+
+The release also includes [`SHA256SUMS`](https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/SHA256SUMS) and GitHub build-provenance attestations. Packages are not currently signed with a distribution-specific GPG key; verify the SHA-256 manifest and attestation when provenance matters.
 
 Verify a downloaded file from the directory containing it:
 
@@ -147,25 +174,43 @@ chmod +x LClip-linux-x64.AppImage
 ./LClip-linux-x64.AppImage --show
 ```
 
+If the AppImage host lacks FUSE, use the recommended portable installer or run the AppImage with `APPIMAGE_EXTRACT_AND_RUN=1`.
+
 Install a distribution package with the normal package manager:
 
 ```bash
 sudo apt install ./LClip-linux-x64.deb
-# or: sudo dnf install ./LClip-linux-x64.rpm
+# Fedora/RHEL:
+sudo dnf install ./LClip-linux-x64.rpm
+# openSUSE:
+sudo zypper install ./LClip-linux-x64.rpm
 ```
 
-Tagged packages provide the app, menu entry, Electron shortcut path, and LClip's per-user login autostart. They do not silently grant `/dev/uinput` access or create GNOME's native custom shortcut. Use the guided installer below for the complete opt-in `ydotool` and GNOME setup, or configure those integrations manually and confirm their separate status rows in Settings.
+Prebuilt packages provide the app, menu entry, Electron shortcut path, and LClip's per-user login autostart. They do not silently grant `/dev/uinput` access or create GNOME's native custom shortcut. Use the source/system installer for complete opt-in `ydotool` and GNOME integration.
 
-## Install on Linux
+### Installed locations for the portable installer
 
-### Before you begin
+| Location | Purpose |
+| --- | --- |
+| `~/.local/opt/lclip/` | Portable application runtime |
+| `~/.local/bin/lclip` | Terminal launcher |
+| `~/.local/share/applications/io.lclip.LClip.desktop` | Application-menu entry |
+| `~/.local/share/icons/hicolor/scalable/apps/io.lclip.LClip.svg` | User application icon |
+| `~/.config/autostart/io.lclip.LClip.desktop` | Per-user login startup |
+| `~/.config/LClip/state.json` | Private clipboard history and settings |
 
-You need:
+## First run
 
-- a 64-bit Linux laptop using x86-64 or ARM64;
-- Node.js 22.12.0 or newer with npm;
-- an active graphical desktop session;
-- `sudo` permission for the system installation.
+1. Open **LClip** from the application menu. If `~/.local/bin` is in `PATH`, `lclip --show` works too.
+2. Open Settings and confirm the separate Electron, portal, GNOME-native, login-startup, paste-bridge, and local-storage rows.
+3. Press `Super + .`. A Wayland desktop may ask once for shortcut approval. If registration is unavailable, create a desktop shortcut pointing to `~/.local/bin/lclip --show`.
+4. Copy two ordinary text values with `Ctrl+C`; open LClip and select the older value.
+5. If automatic paste is unavailable, the value is still on the clipboard—focus the target and press `Ctrl+V`.
+6. Run the guided desktop check with `bash scripts/smoke-linux.sh` from a source checkout when qualifying a machine or release.
+
+## Build and integrate from source
+
+Use this advanced path when you want a system-wide `/opt/lclip` installation, native GNOME shortcut configuration, or restricted `ydotool` `/dev/uinput` integration. It requires Node.js 22.12.0 or newer, npm, Git, an active graphical session, and `sudo`.
 
 Confirm the build tools:
 
@@ -370,7 +415,7 @@ Applications treat GIF clipboard content differently. LClip places an image, an 
 Install dependencies and open the development build:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -380,7 +425,7 @@ Run syntax checks and the automated tests:
 npm run verify
 ```
 
-After installing a release candidate on Linux, run the guided desktop smoke test:
+After installing LClip on Linux, run the guided desktop smoke test:
 
 ```bash
 npm run smoke:linux
@@ -394,7 +439,7 @@ Build an unpacked Linux application:
 npm run pack:linux
 ```
 
-Build AppImage, Debian, and RPM artifacts:
+Build AppImage, Debian, RPM, and portable tar.gz artifacts:
 
 ```bash
 npm run dist:linux
@@ -414,7 +459,7 @@ LClip is an Electron application split into security boundaries:
 - `src/main/window-backend.mjs` selects native or Xwayland-compatible rendering for reliable window movement.
 - `src/preload/preload.cjs` exposes a small, named API to the UI through Electron's context bridge.
 - `src/renderer/` contains the HTML, layered-material CSS, browser-side interaction code, and offline character catalog.
-- `scripts/` contains the Linux system installer and uninstaller.
+- `scripts/` contains no-root release installation, system integration, uninstallation, packaged-runtime smoke, and desktop smoke tools.
 - `tests/` verifies history and persistence behavior, IPC contracts, network limits, paste-bridge selection, window-backend decisions, and offline catalog coverage.
 
 See [technical_details.md](technical_details.md) for a beginner-friendly explanation of Electron, GNOME, KDE, X11, Wayland, portals, IPC, autostart, packaging, and every major runtime flow.
@@ -434,22 +479,32 @@ Clipboard managers are inherently sensitive because copied text can contain secr
 
 ## GitHub and releases
 
-CI runs syntax, state, IPC, network-boundary, desktop-status, and catalog tests, audits the dependency graph, then creates native unpacked builds on x86-64 and ARM64 runners. A matching version tag builds AppImage, Debian, and RPM installers on both architectures, renames them to stable direct-download paths, generates `SHA256SUMS`, and records build provenance attestations.
+CI runs syntax, state, IPC, network-boundary, desktop-status, release-contract, and catalog tests; audits the dependency graph; then builds and launches the packaged application under Xvfb on native x86-64 and ARM64 runners. A matching stable tag publishes AppImage, Debian, RPM, and portable tar.gz artifacts for both architectures, plus the no-root installer, checksum manifest, and build-provenance attestations.
 
 ```bash
 npm run verify
 npm audit --audit-level=high
 npm run verify:release
-git tag -a v1.0.0-beta.1 -m "LClip 1.0.0-beta.1"
+git tag -a v1.0.0 -m "LClip 1.0.0"
 git push origin main
-git push origin v1.0.0-beta.1
+git push origin v1.0.0
 ```
 
-Tags are immutable publication boundaries: do not replace artifacts on an existing tag. Beta releases may retain explicitly pending real-desktop checks; a stable version is rejected while the smoke-test matrix still contains a pending row. Follow the complete gate in [RELEASE.md](RELEASE.md) and review the generated release before distributing it.
+Tags are immutable publication boundaries: do not replace artifacts on an existing tag. Stable publication requires the complete automated distribution contract, native builds, packaged-runtime residency checks, checksums, and attestations. Real compositor checks remain ongoing compatibility evidence rather than fabricated pass claims; automatic paste always retains a copy-only fallback. Follow [RELEASE.md](RELEASE.md) for the exact gate.
 
 ## Uninstall
 
-From a repository checkout, run:
+For a no-root portable installation, download and run the matching stable uninstaller:
+
+```bash
+curl -fLO https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/uninstall-lclip.sh
+chmod +x uninstall-lclip.sh
+./uninstall-lclip.sh
+```
+
+Add `--purge-data` only if clipboard history and settings should also be deleted.
+
+For the guided system installation, run from the same repository checkout:
 
 ```bash
 ./scripts/uninstall-system.sh
@@ -467,10 +522,10 @@ For a tagged Debian or RPM package, disable **Start after login** before removin
 | **[Troubleshooting](troubleshooting.md)** | Diagnose installation, autostart, shortcut, clipboard, automatic-paste, GIPHY, graphics, or development failures |
 | **[Product](PRODUCT.md)** | Read the product purpose, intended users, principles, and accessibility goals |
 | **[Design](DESIGN.md)** | Explore the visual system, interface decisions, colors, spacing, and interaction direction |
-| **[Release Process](RELEASE.md)** | Run the beta/stable gates, publish architecture-specific installers, and verify checksums |
-| **[Changelog](CHANGELOG.md)** | Review user-visible changes and the current validation boundary |
-| **[Production Readiness](PRODUCTION_READINESS.md)** | See verified controls, collected evidence, intentional boundaries, and stable-release blockers |
-| **[History Rewrite](docs/history-rewrite.md)** | Coordinate the one-time `.venv` cleanup without overwriting new remote work or reintroducing old objects |
+| **[Release Process](RELEASE.md)** | Publish architecture-specific stable installers and verify checksums and attestations |
+| **[Changelog](CHANGELOG.md)** | Review stable user-visible changes and compatibility boundaries |
+| **[Production Readiness](PRODUCTION_READINESS.md)** | See the stable controls, collected evidence, and ongoing desktop qualification work |
+| **[History Rewrite](docs/history-rewrite.md)** | Understand the completed `.venv` cleanup and contributor migration |
 
 > New to Linux desktop terminology? Begin with **[LClip Technical Details](technical_details.md)**. If something is not working, go directly to **[LClip Troubleshooting](troubleshooting.md)**.
 

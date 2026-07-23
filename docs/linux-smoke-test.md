@@ -1,38 +1,60 @@
-# Linux Release Smoke Test
+# Linux stable-release verification
 
-Run this checklist on every supported release candidate from the installed artifact—not from a browser preview. Test at least GNOME Wayland and KDE Plasma Wayland; add one X11 desktop before promoting a beta to stable.
+LClip separates release-blocking automation from compositor-specific observation. Native package builds and runtime startup are CI-enforced. GNOME, KDE, Wayland, and X11 behavior is still recorded on real desktops because a headless runner cannot approve a portal, transfer focus, inject input, or drag a compositor-managed window.
 
-## Automated preflight and guided desktop checks
+## CI-enforced architecture checks
+
+| Environment | Build | Runtime launch | Release formats | Enforcement |
+| --- | --- | --- | --- | --- |
+| Automated Linux x86-64 | Native `ubuntu-24.04` runner | 12-second Xvfb residency check | AppImage, deb, rpm, tar.gz | CI-enforced |
+| Automated Linux ARM64 | Native `ubuntu-24.04-arm` runner | 12-second Xvfb residency check | AppImage, deb, rpm, tar.gz | CI-enforced |
+
+A stable tag cannot publish until source verification, dependency audit, both native builds, both runtime launch checks, canonical asset assembly, `SHA256SUMS`, and provenance attestation complete.
+
+## Core fallback contract
+
+These outcomes define stable behavior across supported desktops:
+
+- selecting text or a character writes it to the normal clipboard before input automation is attempted;
+- a working bridge may send `Ctrl+V`, but bridge or compositor rejection keeps the copied value intact and shows the manual-paste instruction;
+- shortcut registration, portal routing, GNOME-native configuration, login startup, paste bridge, and persistence have separate visible status rows;
+- every persistence failure is observable and never displayed as a successful disk save;
+- a fresh global opening resets to Clipboard History, while the reopen after a selection preserves the working mode;
+- user and system installers restore the previous runtime and integration files after activation failures.
+
+## Guided real-desktop check
+
+Run this inside the graphical session being evaluated:
 
 ```bash
 npm run smoke:linux
 ```
 
-The runner verifies the executable, launcher, build marker, resident process, available paste bridge, and GNOME shortcut entry. When attached to a terminal, it guides the operator through the compositor-dependent checks that automation cannot prove.
+The runner accepts either `/opt/lclip` or the no-root `~/.local/opt/lclip` installation. It checks the packaged executable, launcher, build marker, per-user autostart, resident process, available input bridge, and any GNOME custom shortcut. When attached to a terminal it prompts for the interactions that require a human observer.
 
-## Required test matrix
+## Ongoing compatibility matrix
 
-| Environment | Artifact | Shortcut | Window drag | Text paste | Manual fallback | Result | Evidence |
-|---|---|---|---|---|---|---|---|
-| GNOME Wayland with Xwayland | AppImage and deb | Native GNOME + resident process | Required | `ydotool` | Required | Pending | Pending |
-| KDE Plasma Wayland | AppImage | Global Shortcuts portal | Required | `ydotool` or `wtype` | Required | Pending | Pending |
-| GNOME or Plasma X11 | AppImage | Electron/X11 | Required | `xdotool` | Required | Pending | Pending |
-| ARM64 Linux graphical session | ARM64 AppImage or deb | Desktop-specific | Required | Available bridge | Required | Pending | Pending |
+Do not convert “not yet observed on this release” into a pass. Add a dated evidence link whenever a maintainer or user completes a row.
 
-## Release acceptance
+| Environment | Expected shortcut path | Expected paste path | Stable fallback | Current evidence |
+| --- | --- | --- | --- | --- |
+| GNOME Wayland with Xwayland | GNOME custom shortcut from guided install, otherwise Electron/portal | `ydotool`, then `wtype`/`xdotool` when usable | Clipboard + manual `Ctrl+V` | Ongoing community verification |
+| KDE Plasma Wayland | Global Shortcuts portal | `ydotool` or `wtype` | Clipboard + manual `Ctrl+V` | Ongoing community verification |
+| GNOME or Plasma X11 | Electron/X11 | `xdotool` or available bridge | Clipboard + manual `Ctrl+V` | Ongoing community verification |
+| ARM64 graphical Linux | Desktop-specific | Available bridge | Clipboard + manual `Ctrl+V` | Native build/startup is enforced; compositor observations remain ongoing |
 
-- The installed revision shown in Settings matches the artifact under test.
-- `Super + .` opens globally and every fresh invocation resets to History.
-- Post-paste reopening preserves the current mode and query session.
-- The titlebar drag strip works without interfering with Search or Close.
-- History records only non-empty text, deduplicates values, caps entries at 10, and survives restart.
-- A forced unwritable state path produces a visible save error rather than a false success.
-- Automatic paste works where the desktop permits it; otherwise the copy-only message is accurate.
-- GIF searches cancel stale requests, oversized downloads are rejected, and offline errors offer retry.
-- Autostart survives a full logout/login cycle.
-- Settings shows the per-user login-startup entry separately and the entry's `Exec` path still exists.
-- Uninstall removes system integration while preserving user history as documented.
+## Manual acceptance sequence
 
-Do not mark Linux integration verified from unit tests, a macOS build, or the browser preview. Attach the completed matrix and build revision to the GitHub release notes.
+1. Confirm Settings shows the installed version and six distinct integration/storage rows.
+2. Press `Super + .`; if a portal asks for approval, approve only that chord.
+3. Confirm every fresh invocation opens History with an empty search.
+4. Drag the clear 44px strip above Search and confirm Search and Close remain interactive.
+5. Copy two unique text values and confirm deduplication, ordering, and the 10-item limit.
+6. Select the older value in a text editor. Confirm either automatic paste or the explicit manual `Ctrl+V` fallback, then confirm the picker reopens without resetting the current mode.
+7. Search Emoji and Symbols with the keyboard and activate the selected option with Enter.
+8. Force an unwritable state path in a disposable profile and confirm the visible storage error.
+9. Start two GIF searches quickly and confirm the stale request cannot replace the newer results; confirm oversized content is rejected.
+10. Log out and back in to verify the selected autostart setting.
+11. Run the relevant uninstaller and confirm integration is removed while user history is preserved unless purge was requested.
 
-Use `Pass` or `Fail` in the Result column. Evidence must name the distribution/desktop version, session type, architecture, artifact filename, LClip build revision, test date, and a durable log or issue URL. The stable-release validator rejects missing evidence.
+Evidence should identify distribution and version, desktop version, session type, architecture, artifact name, LClip version, test date, result, and a durable issue, workflow, or log URL.

@@ -1,38 +1,42 @@
-# Coordinated `.venv` history cleanup
+# Completed `.venv` history cleanup
 
-The local repository history was rewritten on 2026-07-23 to remove an accidentally committed Python virtual environment. The current tree already ignored `.venv/`; this operation removed the old binary payload from every rewritten commit rather than merely deleting it at `HEAD`.
+The repository history was rewritten on 2026-07-23 to remove an accidentally committed Python virtual environment. Deleting `.venv/` only at `HEAD` would have left hundreds of megabytes reachable from older commits; this cleanup removed those paths from every published branch before the stable release line was tagged.
 
-## Verified local result
+## Verified result
 
-| Measurement | Before | After |
+| Measurement | Before | Rewritten history |
 | --- | ---: | ---: |
 | Reachable `.venv` paths | 4,158 Git objects | 0 |
 | Reachable `.venv` blobs | 3,847 blobs / 260.31 MiB uncompressed | 0 |
-| Packed repository size | 95.30 MiB | 2.61 MiB |
-| `main` tip | `1d9c70fa57763f99fd539ded1fc0a0c8ecc7a215` | `16fe20172c3d93e7198006e989917f74bf67be8e` |
+| Packed repository size | 95.30 MiB | approximately 2.61 MiB before later stable-source additions |
+| Old public `main` tip | `1d9c70fa57763f99fd539ded1fc0a0c8ecc7a215` | replaced by the rewritten stable line |
 
-`git fsck --full --no-reflogs --unreachable` completed cleanly after the temporary rewrite refs and reflogs were removed. A complete pre-rewrite bundle was created and verified outside the repository before cleanup. Keep that bundle private: it deliberately contains the history that was removed.
+`git fsck --full --no-reflogs --unreachable` completed cleanly after temporary rewrite refs and reflogs were removed. A complete pre-rewrite recovery bundle was verified outside the repository. It is deliberately private because it contains the removed objects and must never be uploaded as a release asset, branch, tag, gist, or public archive.
 
-## Remote coordination gate
+## Public repository state
 
-At the time of the rewrite, the GitHub remote exposed only `refs/heads/main` at the old tip and no tags. The local rewrite does **not** change GitHub by itself. Before updating the remote:
+The rewritten stable line was pushed directly to GitHub `main` with an explicit `--force-with-lease` tied to the previously observed old tip. The lease protected remote work that might have appeared between audit and publication. Stable tags are created only from the rewritten line, and no public branch or tag may point back to the removed history.
 
-1. Freeze merges and pushes to `main` and tell every contributor that commit IDs will change.
-2. Confirm `git ls-remote --heads --tags origin` still reports only the expected old `main` tip. If it changed, stop and reconcile the new work instead of forcing over it.
-3. Run the complete verification suite on `codex/production-readiness`.
-4. Push the rewritten production branch to `main` with an explicit lease against the observed old remote hash:
+Maintainers can audit the current public refs with:
 
 ```bash
-git push --force-with-lease=refs/heads/main:1d9c70fa57763f99fd539ded1fc0a0c8ecc7a215 origin codex/production-readiness:main
+git ls-remote --heads --tags origin
+git rev-list --objects --all | grep ' \.venv/' && echo "unexpected .venv history" || echo "clean"
+git fsck --full --no-reflogs --unreachable
 ```
 
-5. Re-run `git ls-remote --heads --tags origin` and verify that `main` points to the intended production commit and no old branch or tag preserves the removed history.
-6. Unfreeze the repository only after CI passes on rewritten `main`.
-
-Do not use an unqualified `--force`; the explicit lease prevents overwriting remote work that appeared after the coordination check.
+Do not create a compatibility branch pointing at the pre-rewrite commit. That would make the removed payload reachable again.
 
 ## Contributor migration
 
-A fresh clone is the safest migration. Contributors who need to preserve local work should create their own bundle or patch series before fetching the rewritten history. A contributor reusing a checkout must first confirm that its working tree is clean, fetch the rewritten remote, and then deliberately realign local branches. Old topic branches should be rebased by replaying the desired patches onto rewritten `main`, not merged wholesale, because merging an old branch makes the removed objects reachable again.
+A fresh clone is the safest migration and gives contributors the smaller repository immediately:
 
-Create release tags only after the remote rewrite is complete. Never publish the private recovery bundle or create a public archive tag pointing at the old history.
+```bash
+git clone https://github.com/Sanal-Sivakumar/Lclip.git
+```
+
+Contributors preserving local work should first create a private bundle or patch series, fetch rewritten `main`, and replay only the desired changes. Old topic branches should be rebased or cherry-picked onto rewritten `main`, never merged wholesale. Merging an old branch would reintroduce the removed object graph.
+
+## Recovery rule
+
+The private recovery bundle exists only for emergency local recovery. Restoring from it requires an explicit maintainer decision and a new cleanup pass before anything is pushed. Normal development, installation, and release work must use the rewritten GitHub history.

@@ -25,7 +25,6 @@ NoDisplay=true
 Hidden=false
 X-GNOME-Autostart-enabled=true
 X-KDE-autostart-after=panel
-OnlyShowIn=GNOME;KDE;XFCE;X-Cinnamon;MATE;LXQt;Unity;
 `;
 }
 

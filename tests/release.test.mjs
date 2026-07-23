@@ -9,17 +9,17 @@ const run = promisify(execFile);
 const project = dirname(dirname(fileURLToPath(import.meta.url)));
 const script = join(project, "scripts", "verify-release.mjs");
 
-test("release metadata accepts the exact beta tag", async () => {
+test("release metadata accepts the exact stable tag and distribution contract", async () => {
   const result = await run(process.execPath, [script], {
     cwd: project,
-    env: { ...process.env, GITHUB_REF_TYPE: "tag", GITHUB_REF_NAME: "v1.0.0-beta.1" }
+    env: { ...process.env, GITHUB_REF_TYPE: "tag", GITHUB_REF_NAME: "v1.0.0" }
   });
-  assert.match(result.stdout, /prerelease metadata is internally consistent/);
+  assert.match(result.stdout, /stable metadata is internally consistent/);
 });
 
 test("release metadata rejects a tag that differs from package.json", async () => {
   await assert.rejects(run(process.execPath, [script], {
     cwd: project,
-    env: { ...process.env, GITHUB_REF_TYPE: "tag", GITHUB_REF_NAME: "v1.0.0-beta.2" }
+    env: { ...process.env, GITHUB_REF_TYPE: "tag", GITHUB_REF_NAME: "v1.0.1" }
   }), /does not match package version/);
 });

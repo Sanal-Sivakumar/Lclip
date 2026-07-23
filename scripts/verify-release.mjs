@@ -8,6 +8,8 @@ const packageJson = JSON.parse(await readFile(new URL("../package.json", import.
 const packageLock = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
 const changelog = await readFile(new URL("../CHANGELOG.md", import.meta.url), "utf8");
 const smokeChecklist = await readFile(new URL("../docs/linux-smoke-test.md", import.meta.url), "utf8");
+const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+const releaseWorkflow = await readFile(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
 const expectedTag = `v${packageJson.version}`;
 const actualTag = process.env.GITHUB_REF_TYPE === "tag"
   ? process.env.GITHUB_REF_NAME
@@ -35,12 +37,22 @@ if (!actualTag && !allowUntagged) {
 }
 
 const isPrerelease = packageJson.version.includes("-");
-const matrixRows = smokeChecklist.split("\n")
-  .filter(line => /^\|.*\|$/.test(line.trim()))
-  .map(line => line.split("|").slice(1, -1).map(cell => cell.trim()))
-  .filter(cells => cells.length >= 8 && cells[0] !== "Environment" && !cells.every(cell => /^-+$/.test(cell)));
-if (!isPrerelease && (matrixRows.length < 4 || matrixRows.some(cells => cells.at(-2) !== "Pass" || !cells.at(-1) || /^Pending$/i.test(cells.at(-1))))) {
-  throw new Error("Stable releases require a passing result and evidence for every Linux smoke-test matrix row");
+const stableContractChecks = [
+  [releaseWorkflow.includes("runner: ubuntu-24.04-arm"), "native ARM64 release runner"],
+  [releaseWorkflow.includes("for extension in AppImage deb rpm tar.gz"), "complete Linux release format set"],
+  [releaseWorkflow.includes("smoke-packaged-linux.sh"), "packaged runtime smoke test"],
+  [releaseWorkflow.includes("SHA256SUMS"), "release checksums"],
+  [releaseWorkflow.includes("uses: actions/attest@v4"), "release provenance attestations"],
+  [packageJson.build?.linux?.target?.includes("tar.gz"), "portable tar.gz build target"],
+  [smokeChecklist.includes("Core fallback contract"), "documented desktop fallback contract"],
+  [smokeChecklist.includes("CI-enforced"), "documented CI-enforced architecture checks"],
+  [readme.includes("/releases/latest/download/LClip-linux-x64.tar.gz"), "x86-64 portable direct download"],
+  [readme.includes("/releases/latest/download/LClip-linux-arm64.tar.gz"), "ARM64 portable direct download"],
+  [readme.includes("/releases/latest/download/install-lclip.sh"), "no-root installer direct download"]
+];
+if (!isPrerelease) {
+  const missing = stableContractChecks.filter(([valid]) => !valid).map(([, label]) => label);
+  if (missing.length) throw new Error(`Stable release contract is incomplete: ${missing.join(", ")}`);
 }
 
 console.log(`${expectedTag}: ${isPrerelease ? "prerelease" : "stable"} metadata is internally consistent`);

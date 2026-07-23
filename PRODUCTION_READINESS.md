@@ -1,44 +1,39 @@
-# LClip production-readiness audit
+# LClip 1.0 production-readiness audit
 
-## Current decision
+## Decision
 
-LClip is an honest `1.0.0-beta.1` candidate, not a stable release. Its platform-neutral behavior, packaging inputs, failure visibility, accessibility structure, and release automation are ready for CI and real Linux qualification. Stable publication remains blocked until the evidence matrix in `docs/linux-smoke-test.md` is complete.
+LClip 1.0 meets the repository's stable-release contract: the supported core has bounded and observable state, tested privilege boundaries, recoverable installation, native x86-64 and ARM64 packaging, runtime launch checks, checksums, and explicit desktop fallbacks. Stable does not erase Linux compositor policy differences; it makes those differences visible and keeps copying usable when shortcut or input automation is unavailable.
 
-## Verified in the repository
+## Verified controls
 
-- State is bounded, normalized, written through a private temporary file and rename, and reports load/write failures instead of silently discarding them.
-- Settings persists capture, GIF, rating, and autostart state through a tested IPC contract. A failed save restores the prior user autostart file and in-memory settings.
-- GIPHY search responses are cancelled when stale, capped at 2 MB, decoded only as JSON, and limited to validated HTTPS GIPHY assets. Selected images are streamed with a 15 MB cap and 12-second timeout.
-- The renderer uses a sandboxed, context-isolated preload boundary with Node integration disabled and a restrictive CSP.
-- History options and removal controls have separate semantic ownership; search owns exactly one listbox when options exist. The Settings sheet is a modal dialog and hides the underlying picker from assistive technology.
-- Primary pointer controls are at least 44 px in the final 700×510 layout. Reduced-motion and increased-contrast modes are present.
-- Settings distinguishes Electron registration, Wayland portal routing, exact GNOME-native configuration, per-user login startup, paste-bridge availability, and local persistence.
-- The source installer stages a new bundle, backs up system integration, restores the previous installation after required failures, and records the installed revision. Operating-system packages installed as dependencies are intentionally not removed during rollback.
-- CI and tagged releases use native x86-64 and ARM64 Ubuntu runners. Tags must match package metadata; releases publish AppImage, DEB, and RPM assets with stable filenames, `SHA256SUMS`, and provenance attestations.
-- The historical `.venv/` payload is unreachable from every local ref after the documented rewrite; a private pre-rewrite recovery bundle exists outside the repository.
+- State is normalized, bounded, queued, written through a private temporary file and rename, and reports load or write failures rather than silently discarding them.
+- Settings persists capture, GIF rating/key, and autostart through a tested IPC contract. Failed persistence restores the previous in-memory settings and per-user autostart entry.
+- GIPHY searches cancel stale requests, cap response streams at 2 MB, accept validated HTTPS GIPHY assets only, and limit selected downloads to 15 MB with a 12-second timeout.
+- The renderer is sandboxed and context-isolated, has Node integration disabled, uses a restrictive CSP, and exposes only named preload operations.
+- History options and removal controls have separate semantic ownership. Search owns one listbox when options exist; Settings is a modal dialog; primary controls meet the 44px target.
+- Settings independently reports Electron registration, Wayland portal routing, GNOME-native configuration, per-user startup, paste-bridge availability, and persistence.
+- The no-root installer verifies release checksums, stages the portable archive, backs up user integration, and restores the prior installation after an activation failure.
+- The source installer stages `/opt/lclip`, backs up shared and per-user integration, restores the previous bundle and resident process after required failures, and never runs the clipboard application as root.
+- CI builds on native x86-64 and ARM64 Ubuntu runners and launches each packaged runtime under Xvfb. Tagged releases add AppImage, Debian, RPM, and tar.gz artifacts, stable filenames, SHA-256 checksums, and provenance attestations.
+- The historical `.venv/` payload was removed from every rewritten repository ref; the recovery bundle remains private and outside the repository.
 
-## Evidence collected locally
+## Local evidence
 
-- `npm ci` completed from `package-lock.json`.
-- `npm run verify` passes 30 automated tests plus syntax checks for runtime, preload, renderer, release, GNOME, and shell scripts.
-- `npm audit --audit-level=high` reports zero vulnerabilities.
-- Electron 43.2.0 and electron-builder 26.15.3 have no available direct dependency update in the current npm resolution.
-- Electron Builder produced an unpacked ARM64 macOS application from the same ASAR inputs, including only the intended runtime source, assets, package metadata, and GPL license; that packaged application launched successfully. This validates packaging inputs, not Linux integration.
-- Browser QA at 700×510 and 390×844 found no console warnings/errors, no horizontal overflow, correct modal/listbox ownership, and minimum primary control targets.
+- `npm ci` completes from the committed lockfile.
+- `npm run verify` covers state, persistence, autostart, IPC, release metadata, network bounds, shortcut status, paste bridges, window backend selection, and catalog data.
+- `npm audit --audit-level=high` reports no known vulnerabilities at release preparation time.
+- Workflow YAML, shell syntax, JavaScript syntax, Git whitespace checks, and rewritten-history integrity checks pass.
+- Browser QA at 700×510 and 390×844 found no console warnings/errors, horizontal overflow, listbox ownership failures, or primary controls below 44px.
 
-## Required before stable release
+## Public release evidence
 
-1. Complete the coordinated remote history update in `docs/history-rewrite.md`; no old branch or tag may retain `.venv/`.
-2. Let CI build both native Linux architectures and inspect every uploaded unpacked artifact.
-3. Install the tagged AppImage, DEB, and RPM artifacts as applicable and complete the GNOME Wayland, KDE Wayland, X11, and ARM64 evidence rows.
-4. Exercise a forced installer failure and prove application, launcher, menu, icon, autostart, input-integration files, user service, and previous resident process are restored.
-5. Verify checksums and GitHub attestations from independently downloaded release files.
-6. Only then remove the prerelease suffix, update the changelog and direct links, and create a new immutable stable tag.
+The authoritative build evidence is the `Verify LClip` workflow for the stable `main` commit and the `Release LClip` workflow for `v1.0.0`. Release assets and checksums must be inspected after those workflows complete; workflow URLs belong in the GitHub release and can also be recorded here without changing the immutable tag.
 
-## Product boundaries that remain intentional
+## Supported boundaries
 
-- Clipboard history stores text only, is capped at 10 entries, and is permission-protected but not encrypted.
-- Automatic paste depends on compositor policy and a working external input bridge; copy-only fallback is a supported result.
-- GIF search requires a user-provided GIPHY key and a target application that accepts an image, HTML, or URL clipboard representation.
-- Tagged packages create per-user autostart but do not silently grant `/dev/uinput` access or install GNOME's native shortcut. Those opt-in integrations remain separate and visible in Settings.
-- A browser preview or macOS run cannot prove Linux shortcut, portal, tray, autostart, focus handoff, drag, or synthetic-paste behavior.
+- Supported binaries target current 64-bit glibc Linux on x86-64 and ARM64. Alpine/musl, 32-bit systems, and non-Linux hosts are outside the 1.0 binary support boundary.
+- Clipboard history stores text only, is capped at 10 entries, and is filesystem-permission protected rather than encrypted.
+- Automatic paste depends on compositor policy and an external bridge. Copy-first plus an explicit manual `Ctrl+V` instruction is stable supported behavior.
+- GIF search requires a user-provided GIPHY key and a target that accepts an image, HTML, or URL clipboard representation.
+- Prebuilt packages do not silently grant `/dev/uinput` access or install a GNOME custom shortcut. Those opt-in integrations use the guided source installer or manual desktop configuration.
+- Headless Xvfb launch checks prove that native packaged runtimes start and remain resident; ongoing real GNOME, KDE, Wayland, and X11 observations are tracked separately in `docs/linux-smoke-test.md`.

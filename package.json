@@ -1,6 +1,6 @@
 {
   "name": "lclip",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0",
   "description": "A system-integrated clipboard history and expression picker for Linux",
   "main": "src/main/main.mjs",
   "type": "module",
@@ -41,7 +41,8 @@
       "target": [
         "AppImage",
         "deb",
-        "rpm"
+        "rpm",
+        "tar.gz"
       ],
       "category": "Utility",
       "executableName": "lclip",

@@ -42,3 +42,7 @@ Use one mostly opaque translucent window material, a fine internal highlight, an
 ## Motion
 
 Use 160–220ms ease-out transitions for appearing, selection, tab changes, and dismissal. No launch sequence or decorative choreography. Reduced motion removes transforms and uses immediate opacity changes.
+
+## Stable interface contract
+
+The 1.0 interface treats premium quality as clarity rather than decoration. Primary controls retain a minimum 44px target, one combobox owns one listbox, destructive history actions remain outside option semantics, and Settings behaves as a modal surface with the picker hidden from assistive technology. Persistence, shortcut, portal, GNOME-native, autostart, and paste-bridge states use distinct text labels; visual polish must never collapse those platform differences into a generic “active” claim.

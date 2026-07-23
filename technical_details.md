@@ -132,7 +132,7 @@ LClip also writes an explicit per-user entry at:
 ~/.config/autostart/io.lclip.LClip.desktop
 ```
 
-Disabling autostart writes `Hidden=true`. Enabling it writes a complete launch entry using the current packaged executable or the original AppImage path. Because this is runtime-owned rather than dependent on the guided installer, tagged AppImage, Debian, and RPM builds can honor the same Settings control. The per-user file overrides the same-named system fallback without creating a duplicate launch.
+Disabling autostart writes `Hidden=true`. Enabling it writes a complete launch entry using the current packaged executable or the original AppImage path. Because this is runtime-owned rather than dependent on the guided installer, portable, AppImage, Debian, and RPM builds can honor the same Settings control. The per-user file overrides the same-named system fallback without creating a duplicate launch.
 
 ### `.desktop` file
 
@@ -234,7 +234,7 @@ The first process start is a **cold start** because Electron and the renderer mu
 
 ### Installed build identity
 
-The system installer records the checkout's 12-character Git revision in `/opt/lclip/resources/LCLIP_BUILD`. The main process reads this marker at startup and exposes it only to the Settings integration card. If Git metadata is unavailable, the package version is used instead. This makes a stale resident process visible: after reinstalling, Settings must show the same revision printed by the installer.
+The system installer records the checkout's 12-character Git revision in `/opt/lclip/resources/LCLIP_BUILD`. The no-root installer records the tagged version in `~/.local/opt/lclip/resources/LCLIP_PORTABLE_INSTALL`, while a direct distribution package falls back to its application version. The main process exposes the available build identity only to the Settings integration card. This makes a stale resident process visible after reinstalling.
 
 ### Capture flow
 
@@ -385,7 +385,8 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 - **unpacked directory** — useful for system installation and inspection;
 - **AppImage** — a portable executable image used by many Linux distributions;
 - **DEB** — a package format used by Debian, Ubuntu, and related distributions;
-- **RPM** — a package format used by Fedora, RHEL, openSUSE, and related systems.
+- **RPM** — a package format used by Fedora, RHEL, openSUSE, and related systems;
+- **tar.gz** — a FUSE-free portable runtime used by LClip's no-root installer.
 
 ### ASAR
 
@@ -393,7 +394,7 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 
 ### Processor architecture
 
-**x86-64** (`x86_64` or `amd64`) is common on Intel and AMD laptops. **ARM64** (`aarch64` or `arm64`) is used by some Linux laptops and single-board systems. The installer detects `uname -m` and finds the matching Electron Builder output.
+**x86-64** (`x86_64` or `amd64`) is common on Intel and AMD laptops. **ARM64** (`aarch64` or `arm64`) is used by some Linux laptops and single-board systems. Native GitHub runners build both architectures. The no-root installer detects `uname -m`, downloads the matching tar.gz archive, and verifies it against the release checksum manifest before extraction.
 
 ### `/opt` and `/usr/local/bin`
 
@@ -404,6 +405,12 @@ The GIPHY key is stored in a file protected by filesystem permissions, not in an
 `sudo` runs an approved command with administrator privileges. LClip needs it to write system locations, but the installed app later runs as the normal desktop user.
 
 ### Installer modes
+
+The stable release provides two installation families:
+
+- `install-lclip.sh`: no-root, no-Node, FUSE-free installation below `~/.local`; it verifies release checksums and rolls back user integration on activation failure.
+- `uninstall-lclip.sh`: removes only a marked per-user portable installation and preserves state unless `--purge-data` is explicit.
+- `scripts/install-system.sh`: builds from source and integrates under `/opt`, optionally configuring native GNOME and restricted `ydotool` access.
 
 - No option: builds, verifies, installs, and attempts best-effort bridge package/service setup.
 - `--configure-ydotool`: additionally configures restricted `/dev/uinput` access for the current desktop user.
@@ -429,7 +436,7 @@ Before packaging, the installer removes `dist/` so an old unpacked bundle cannot
 - the offline emoji, kaomoji, and symbol catalogs meet their minimum sizes, contain searchable metadata, and do not duplicate values.
 - Wayland sessions choose Xwayland only when it is available and the user has not requested native Wayland.
 
-The current suite contains 30 automated tests covering state, persistence, autostart, IPC, GIPHY bounds and cancellation, release-tag consistency, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. These tests do not prove end-to-end integration with every GNOME, KDE, Wayland, X11, portal, input bridge, target application, display scale, or distribution. The evidence-bearing Linux matrix in `docs/linux-smoke-test.md` remains required for stable-release confidence.
+The current suite contains 30 automated tests covering state, persistence, autostart, IPC, GIPHY bounds and cancellation, the stable release contract, shortcut-status reporting, paste-bridge selection, backend decisions, and offline catalog counts. CI additionally builds and launches the packaged runtime under Xvfb on native x86-64 and ARM64 runners. These checks do not fabricate portal approval, focus transfer, input injection, or window-drag evidence; real-desktop observations remain documented in `docs/linux-smoke-test.md`, while copy-first manual fallback is part of the stable contract.
 
 ## 11. License and copyleft
 
@@ -451,6 +458,7 @@ Authoritative references: [GNU GPL licenses](https://www.gnu.org/licenses/) and 
 - GIFs require a GIPHY key, network access, and a target that accepts an image or HTML clipboard format.
 - The tray icon may be hidden by GNOME without a tray extension.
 - Clipboard history is protected by file permissions but is not encrypted.
-- Linux integration has to be verified on real target systems; macOS can validate only platform-neutral parts.
+- Prebuilt 1.0 binaries target current 64-bit glibc Linux; Alpine/musl and 32-bit systems are outside the published binary boundary.
+- Real desktops remain the authority for portal approval, focus transfer, drag, and synthetic input; macOS and Xvfb validate only platform-neutral or packaged-startup behavior.
 
 For symptom-based diagnosis and commands, continue with [troubleshooting.md](troubleshooting.md).

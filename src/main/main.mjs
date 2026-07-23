@@ -44,11 +44,13 @@ let autostartStatus = { configured: false, label: "Not checked" };
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const rendererPath = (...parts) => join(app.getAppPath(), "src", "renderer", ...parts);
 const buildRevision = (() => {
-  try {
-    return readFileSync(join(process.resourcesPath, "LCLIP_BUILD"), "utf8").trim().slice(0, 80) || `v${app.getVersion()}`;
-  } catch {
-    return app.isPackaged ? `v${app.getVersion()}` : "development checkout";
+  for (const marker of ["LCLIP_BUILD", "LCLIP_PORTABLE_INSTALL"]) {
+    try {
+      const value = readFileSync(join(process.resourcesPath, marker), "utf8").trim().slice(0, 80);
+      if (value) return value;
+    } catch {}
   }
+  return app.isPackaged ? `v${app.getVersion()}` : "development checkout";
 })();
 
 function publicState() {

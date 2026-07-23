@@ -34,3 +34,7 @@ No dashboard shell, oversized marketing UI, neon gamer styling, decorative glass
 ## Accessibility & Inclusion
 
 Target WCAG 2.2 AA, complete keyboard navigation, visible focus, 44px minimum primary targets, readable contrast over translucent surfaces, screen-reader labels, reduced-motion behavior, and redundant color-plus-text status communication.
+
+## Stable distribution promise
+
+LClip 1.0 is distributed for current 64-bit glibc Linux systems on x86-64 and ARM64. The default no-root installer uses a checksum-verified portable archive and creates only per-user files; AppImage, Debian, and RPM formats remain available for users who prefer them. Core selection never depends on synthetic input succeeding: LClip copies the chosen value first, attempts the available bridge, and clearly requests manual `Ctrl+V` when desktop policy blocks automation. Platform-specific enhancements may vary, but failure must remain visible and data-preserving.

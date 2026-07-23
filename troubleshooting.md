@@ -19,6 +19,7 @@ This document records the important development problems addressed in LClip and 
 | Wallpaper made text hard to read | The original glass base allowed too much detailed background through | Higher-opacity tinted material with stronger blur and accessible foreground contrast |
 | Project license was permissive MIT despite a permanent open-source goal | MIT permits proprietary redistribution | Replaced with full GNU GPLv3 text and consistent `GPL-3.0-only` project metadata |
 | New installation still displayed the removed footer and immovable window | `/opt/lclip` was replaced while the old Electron process continued running code already loaded in memory | Installer now stops the resident instance, clears stale build output, activates a staged bundle with rollback, records the Git revision, and starts the new process |
+| Users needed Node.js and administrator access just to try LClip | Only the source/system installer existed | Stable releases now include checksum-verified x86-64 and ARM64 tar.gz runtimes plus a rollback-safe no-root installer |
 
 ## 1. Quick diagnosis
 
@@ -27,6 +28,7 @@ Run these commands from a Linux terminal:
 ```bash
 printf 'Session: %s\nDesktop: %s\n' "$XDG_SESSION_TYPE" "$XDG_CURRENT_DESKTOP"
 command -v lclip
+ls -l ~/.local/opt/lclip/lclip /opt/lclip/lclip 2>/dev/null || true
 pgrep -a lclip
 command -v ydotool || true
 command -v wtype || true
@@ -36,7 +38,7 @@ ls -l /dev/uinput 2>/dev/null || true
 systemctl --user status ydotool.service --no-pager 2>/dev/null || true
 systemctl --user status ydotoold.service --no-pager 2>/dev/null || true
 systemctl --user status lclip-ydotoold.service --no-pager 2>/dev/null || true
-ls -l /etc/xdg/autostart/io.lclip.LClip.desktop
+ls -l /etc/xdg/autostart/io.lclip.LClip.desktop 2>/dev/null || true
 ls -l ~/.config/autostart/io.lclip.LClip.desktop 2>/dev/null || true
 ```
 
@@ -49,6 +51,7 @@ Interpretation:
 - No input-bridge command means selection will copy successfully but cannot automatically send `Ctrl+V`.
 - On a `--configure-ydotool` installation, `groups` should include `lclip-uinput` after logout/login.
 - `/dev/uinput` should show group `lclip-uinput` and group read/write permission.
+- `~/.local/opt/lclip` indicates a no-root portable install; `/opt/lclip` indicates the guided system install.
 
 ## 2. Development problem log
 
@@ -128,6 +131,50 @@ This section distinguishes solved design problems from environment-dependent lim
 
 ## 3. Installation failures
 
+### The portable installer download returns 404
+
+**Cause:** A stable release has not been published at the requested tag, the repository path was changed, or GitHub is temporarily unavailable.
+
+**Solution:** Open the [latest release](https://github.com/Sanal-Sivakumar/Lclip/releases/latest) and confirm that `install-lclip.sh`, both architecture-specific tar.gz files, and `SHA256SUMS` are present. Do not bypass a missing checksum by extracting an unrelated file. To install a specific existing version:
+
+```bash
+./install-lclip.sh --release 1.0.0
+```
+
+### `The release checksum manifest is incomplete` or checksum verification fails
+
+**Cause:** The archive, icon, or `SHA256SUMS` is incomplete, belongs to another release, or was modified in transit or on disk.
+
+**Solution:** Delete only the downloaded files, download them again from the same GitHub release, and retry. Never edit `SHA256SUMS` to match an unexpected file. The installer does not activate an unverified archive.
+
+### `Unsupported architecture`
+
+**Cause:** Stable binaries are published for `x86_64`/`amd64` and `aarch64`/`arm64`. A 32-bit, RISC-V, PowerPC, or other machine does not match those assets.
+
+**Solution:** Confirm `uname -m`. Use a supported 64-bit machine or build Electron and LClip from source for that architecture; an unlisted architecture is not part of the 1.0 binary support boundary.
+
+### AppImage reports a FUSE error
+
+**Cause:** Some distributions do not install the legacy FUSE compatibility library by default.
+
+**Solution:** Prefer `install-lclip.sh`, which uses the tar.gz runtime and does not require FUSE. For a one-time AppImage launch:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./LClip-linux-x64.AppImage --show
+```
+
+### The no-root installer succeeds but `lclip` is not found
+
+**Cause:** The launcher is in `~/.local/bin`, but that directory is not in the current shell's `PATH`.
+
+**Solution:** Open LClip from the application menu or run `~/.local/bin/lclip --show`. Add `~/.local/bin` through the shell's normal profile configuration if a terminal command is desired; do not move the runtime out of `~/.local/opt/lclip` because its desktop and autostart entries point there.
+
+### A no-root upgrade fails
+
+**Expected behavior:** `install-lclip.sh` keeps the previous runtime and the launcher, desktop entry, icon, and autostart files until the new verified archive is ready. If activation fails, it restores those files and restarts the previous resident process when possible.
+
+Inspect `${TMPDIR:-/tmp}/lclip-user-rollback.log` only if the restored resident process did not restart. Running the installer again is safe after fixing disk-space, permission, or network problems.
+
 ### `LClip's system installer must be run on Linux.`
 
 **Cause:** `scripts/install-system.sh` was executed on macOS or another non-Linux system.
@@ -142,11 +189,11 @@ This section distinguishes solved design problems from environment-dependent lim
 
 ### `npm: command not found`, `npm WARN EBADENGINE`, or Node is too old
 
-**Cause:** Node.js and npm are build dependencies, not bundled in the source repository.
+**Cause:** Node.js and npm are build dependencies for the source/system path, not for stable prebuilt releases.
 
 Electron 43 and its current packaging dependencies require Node.js 22.12.0 or newer. Ubuntu's Node.js 18 package is too old even though LClip's syntax checks and unit tests may still pass with it.
 
-**Solution:** Install Node.js 22 using the distribution's supported package source or a trusted Node version manager. Confirm:
+**Solution:** For normal use, install the stable portable release from `README.md` and skip Node.js entirely. To build from source, install Node.js 22 using the distribution's supported package source or a trusted Node version manager. Confirm:
 
 ```bash
 node --version
@@ -296,20 +343,20 @@ sed -n '1,10p' /usr/local/bin/lclip
 lclip --show
 ```
 
-`command -v lclip` should print `/usr/local/bin/lclip`, and that launcher should execute `/opt/lclip/lclip "$@"`.
+For a system installation, `command -v lclip` should print `/usr/local/bin/lclip`, and that launcher should execute `/opt/lclip/lclip "$@"`. For a portable installation it should normally print `~/.local/bin/lclip` and execute `~/.local/opt/lclip/lclip`.
 
 ### `lclip: command not found`
 
-**Cause:** The launcher was not installed or `/usr/local/bin` is not in the shell's `PATH`.
+**Cause:** The launcher was not installed, or the relevant launcher directory is not in the shell's `PATH`.
 
 **Checks:**
 
 ```bash
-ls -l /usr/local/bin/lclip
+ls -l ~/.local/bin/lclip /usr/local/bin/lclip 2>/dev/null || true
 printf '%s\n' "$PATH"
 ```
 
-**Solution:** Rerun the installer. If the launcher exists, add `/usr/local/bin` through the shell's normal configuration or execute `/usr/local/bin/lclip --show` directly.
+**Solution:** Rerun the relevant installer. Portable installs use `~/.local/bin/lclip`; system installs use `/usr/local/bin/lclip`. Add the existing directory through the shell's normal configuration or execute the full path directly.
 
 ### LClip does not start after login
 
@@ -320,12 +367,12 @@ printf '%s\n' "$PATH"
 ```bash
 cat ~/.config/autostart/io.lclip.LClip.desktop 2>/dev/null || true
 pgrep -a lclip
-/usr/local/bin/lclip --show
+"$(command -v lclip 2>/dev/null || printf '%s' "$HOME/.local/bin/lclip")" --show
 ```
 
 If the user entry contains `Hidden=true`, enable “Start after login” in Settings so LClip rewrites a complete enabled entry. Deleting it can reveal the guided installer's system fallback and unintentionally re-enable startup.
 
-Then log out and back in. If the desktop is not listed in `OnlyShowIn`, manual startup may work but the installer needs an explicit compatibility update for that environment.
+Then log out and back in. LClip's user entry does not use a hardcoded `OnlyShowIn` list, so any desktop implementing standard XDG autostart may launch it.
 
 ### Running `lclip --show` seems to do nothing
 
@@ -766,7 +813,14 @@ Do not replace every `MIT` occurrence inside `package-lock.json`. Those remainin
 
 ## 11. Safe reset and clean reinstall
 
-First uninstall system files:
+For a portable installation, use the stable uninstaller and preserve data by default:
+
+```bash
+./uninstall-lclip.sh
+./install-lclip.sh
+```
+
+For a source/system installation, uninstall shared files:
 
 ```bash
 ./scripts/uninstall-system.sh
@@ -774,7 +828,7 @@ First uninstall system files:
 
 The uninstaller preserves user state. To reset state, first quit LClip, locate the exact `state.json`, make a backup if needed, and then remove only LClip's user-data directory. Never use a broad command such as `rm -rf ~/.config`.
 
-Reinstall from the repository:
+Reinstall from the repository when system integration is required:
 
 ```bash
 ./scripts/install-system.sh

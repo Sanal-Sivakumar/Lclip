@@ -17,10 +17,30 @@ printf 'LClip Linux desktop smoke test\n'
 printf 'Session: %s · Desktop: %s · Display: %s · Wayland: %s\n\n' \
   "${XDG_SESSION_TYPE:-unknown}" "${XDG_CURRENT_DESKTOP:-unknown}" "${DISPLAY:-none}" "${WAYLAND_DISPLAY:-none}"
 
-if [[ -x /opt/lclip/lclip ]]; then pass "Packaged executable is installed"; else fail "/opt/lclip/lclip is missing"; fi
-if [[ -x /usr/local/bin/lclip ]]; then pass "System launcher is installed"; else fail "/usr/local/bin/lclip is missing"; fi
-if [[ -f /opt/lclip/resources/LCLIP_BUILD ]]; then
-  pass "Build marker: $(tr -d '\n' </opt/lclip/resources/LCLIP_BUILD)"
+PORTABLE_PREFIX="${LCLIP_PREFIX:-$HOME/.local}"
+if [[ -x /opt/lclip/lclip ]]; then
+  RUNTIME_EXECUTABLE=/opt/lclip/lclip
+  BUILD_MARKER=/opt/lclip/resources/LCLIP_BUILD
+elif [[ -x "$PORTABLE_PREFIX/opt/lclip/lclip" ]]; then
+  RUNTIME_EXECUTABLE="$PORTABLE_PREFIX/opt/lclip/lclip"
+  BUILD_MARKER="$PORTABLE_PREFIX/opt/lclip/resources/LCLIP_PORTABLE_INSTALL"
+else
+  RUNTIME_EXECUTABLE=""
+  BUILD_MARKER=""
+fi
+if [[ -n "$RUNTIME_EXECUTABLE" ]]; then pass "Packaged executable is installed: $RUNTIME_EXECUTABLE"; else fail "No system or per-user packaged executable was found"; fi
+
+if [[ -x /usr/local/bin/lclip ]]; then
+  LCLIP_LAUNCHER=/usr/local/bin/lclip
+elif [[ -x "$PORTABLE_PREFIX/bin/lclip" ]]; then
+  LCLIP_LAUNCHER="$PORTABLE_PREFIX/bin/lclip"
+else
+  LCLIP_LAUNCHER="$(command -v lclip 2>/dev/null || true)"
+fi
+if [[ -n "$LCLIP_LAUNCHER" ]]; then pass "Launcher is installed: $LCLIP_LAUNCHER"; else fail "No LClip launcher was found"; fi
+
+if [[ -n "$BUILD_MARKER" && -f "$BUILD_MARKER" ]]; then
+  pass "Build marker: $(tr -d '\n' <"$BUILD_MARKER")"
 else
   warn "Build marker is missing"
 fi
@@ -41,7 +61,7 @@ if [[ "${XDG_CURRENT_DESKTOP^^}" == *GNOME* ]] && command -v gsettings >/dev/nul
   GNOME_COMMAND="$(gsettings get "$GNOME_TARGET" command 2>/dev/null | tr -d "'" || true)"
   GNOME_BINDING="$(gsettings get "$GNOME_TARGET" binding 2>/dev/null | tr -d "'" || true)"
   if gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings | grep -q '/lclip/' \
-    && [[ "$GNOME_COMMAND" == "/usr/local/bin/lclip --show" ]] \
+    && [[ -n "$LCLIP_LAUNCHER" && "$GNOME_COMMAND" == "$LCLIP_LAUNCHER --show" ]] \
     && [[ "$GNOME_BINDING" == "<Super>period" ]]; then
     pass "GNOME native shortcut has the exact LClip command and Super + . binding"
   else
@@ -49,12 +69,12 @@ if [[ "${XDG_CURRENT_DESKTOP^^}" == *GNOME* ]] && command -v gsettings >/dev/nul
   fi
 fi
 
-if pgrep -f '^/opt/lclip/lclip( |$)' >/dev/null 2>&1; then
+if [[ -n "$RUNTIME_EXECUTABLE" ]] && pgrep -f -- "$RUNTIME_EXECUTABLE" >/dev/null 2>&1; then
   pass "Resident LClip process is running"
-elif [[ -x /usr/local/bin/lclip ]]; then
-  /usr/local/bin/lclip --hidden >"${TMPDIR:-/tmp}/lclip-smoke-startup.log" 2>&1 &
+elif [[ -n "$LCLIP_LAUNCHER" ]]; then
+  "$LCLIP_LAUNCHER" --hidden >"${TMPDIR:-/tmp}/lclip-smoke-startup.log" 2>&1 &
   sleep 1
-  if pgrep -f '^/opt/lclip/lclip( |$)' >/dev/null 2>&1; then pass "Resident process started"; else fail "Resident process did not start; inspect ${TMPDIR:-/tmp}/lclip-smoke-startup.log"; fi
+  if [[ -n "$RUNTIME_EXECUTABLE" ]] && pgrep -f -- "$RUNTIME_EXECUTABLE" >/dev/null 2>&1; then pass "Resident process started"; else fail "Resident process did not start; inspect ${TMPDIR:-/tmp}/lclip-smoke-startup.log"; fi
 fi
 
 ask() {
