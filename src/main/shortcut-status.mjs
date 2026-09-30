@@ -12,27 +12,70 @@ export async function detectGnomeNativeShortcut({ platform = process.platform, e
   if (!supported) return { supported: false, configured: false, label: "Not a GNOME session" };
   try {
     const list = await run("gsettings", ["get", ROOT_SCHEMA, "custom-keybindings"], { encoding: "utf8", timeout: 1500 });
-    if (!String(list.stdout || "").includes(BINDING_PATH)) return { supported: true, configured: false, label: "GNOME shortcut not configured" };
-    const target = `${BINDING_SCHEMA}:${BINDING_PATH}`;
-    const [command, binding] = await Promise.all([
-      run("gsettings", ["get", target, "command"], { encoding: "utf8", timeout: 1500 }),
-      run("gsettings", ["get", target, "binding"], { encoding: "utf8", timeout: 1500 })
-    ]);
-    const commandValue = String(command.stdout || "").replaceAll("'", "").trim();
-    const bindingValue = String(binding.stdout || "").replaceAll("'", "").trim();
-    const valuesMatch = commandValue === "/usr/local/bin/lclip --show" && bindingValue === "<Super>period";
-    let executableExists = false;
-    if (valuesMatch) {
+    const listOutput = String(list.stdout || "").trim();
+    const bindingPaths = [...listOutput.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    if (!bindingPaths.length) return { supported: true, configured: false, label: "GNOME shortcut not configured" };
+
+    const pathsToCheck = bindingPaths.includes(BINDING_PATH)
+      ? [BINDING_PATH, ...bindingPaths.filter(p => p !== BINDING_PATH)]
+      : bindingPaths;
+
+    let sawMatchingBindingWithoutCommand = false;
+
+    for (const path of pathsToCheck) {
+      const target = `${BINDING_SCHEMA}:${path}`;
       try {
-        await accessFile("/usr/local/bin/lclip");
-        executableExists = true;
+        const [commandRes, bindingRes] = await Promise.all([
+          run("gsettings", ["get", target, "command"], { encoding: "utf8", timeout: 1500 }),
+          run("gsettings", ["get", target, "binding"], { encoding: "utf8", timeout: 1500 })
+        ]);
+        const commandValue = String(commandRes.stdout || "").replaceAll("'", "").trim();
+        const bindingValue = String(bindingRes.stdout || "").replaceAll("'", "").trim();
+
+        if (bindingValue !== "<Super>period") continue;
+
+        if (!commandValue.endsWith("--show") || (!commandValue.includes("lclip") && path !== BINDING_PATH)) {
+          continue;
+        }
+
+        let execPath = commandValue.replace(/\s+--show$/, "").trim();
+        if (execPath.startsWith("~/") && env.HOME) {
+          execPath = `${env.HOME}/${execPath.slice(2)}`;
+        }
+
+        try {
+          await accessFile(execPath);
+          return {
+            supported: true,
+            configured: true,
+            label: "GNOME native shortcut configured"
+          };
+        } catch {
+          sawMatchingBindingWithoutCommand = true;
+        }
       } catch {}
     }
-    const configured = valuesMatch && executableExists;
+
+    if (sawMatchingBindingWithoutCommand) {
+      return {
+        supported: true,
+        configured: false,
+        label: "GNOME shortcut command is missing"
+      };
+    }
+
+    if (bindingPaths.includes(BINDING_PATH)) {
+      return {
+        supported: true,
+        configured: false,
+        label: "GNOME shortcut differs from the LClip binding"
+      };
+    }
+
     return {
       supported: true,
-      configured,
-      label: configured ? "GNOME native shortcut configured" : valuesMatch ? "GNOME shortcut command is missing" : "GNOME shortcut differs from the LClip binding"
+      configured: false,
+      label: "GNOME shortcut not configured"
     };
   } catch {
     return { supported: true, configured: false, label: "GNOME shortcut status unavailable" };

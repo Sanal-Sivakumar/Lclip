@@ -8,7 +8,7 @@ This document records the important development problems addressed in LClip and 
 | --- | --- | --- |
 | Old launcher requested `.venv/bin/python3` | Legacy Python installation remained earlier in `PATH` | Current Electron installer replaces `/usr/local/bin/lclip`; troubleshooting identifies additional stale launchers |
 | `npm WARN EBADENGINE` followed by `ERR_REQUIRE_ESM` | Ubuntu Node.js 18 was too old for Electron 43 | Node `>=22.12.0`, `.nvmrc`, package engine declaration, and installer preflight check |
-| Electron aborted on `chrome-sandbox` | Helper ownership/mode was unsafe after copying | Installer applies `root:root` ownership and mode `4755` |
+| Electron aborted on `chrome-sandbox` | Helper ownership/mode was invalid or user-owned helper binary was left in portable install | Portable installer removes helper to use unprivileged user namespaces; system installer applies `root:root` mode `4755` |
 | `Super + .` did not open the picker | Electron/Wayland portal registration was unavailable or conflicted | GNOME-native custom shortcut plus Electron registration of the same chord |
 | First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
 | Picker disappeared permanently after one selection | Earlier activation hid the picker but did not reopen it | The proven hide-and-paste flow now reopens the existing picker after every attempt |
@@ -266,26 +266,64 @@ Do not manually copy an artifact for a different processor architecture.
 
 ## 4. Startup and process failures
 
-### `FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166`
+### `FATAL: The SUID sandbox helper binary was found, but is not configured correctly`
 
-The complete message says that `/opt/lclip/chrome-sandbox` must be owned by root and have mode `4755`.
-
-**Cause:** Electron uses a small set-user-ID sandbox helper on Linux. The custom system installer copied the unpacked Electron bundle while preserving the build user's ownership. Chromium refuses to start when this security-sensitive helper exists with unsafe ownership or permissions.
-
-**Immediate repair:**
-
-```bash
-sudo chown root:root /opt/lclip/chrome-sandbox
-sudo chmod 4755 /opt/lclip/chrome-sandbox
-ls -l /opt/lclip/chrome-sandbox
-/usr/local/bin/lclip --show
+The complete message typically states:
+```text
+FATAL: The SUID sandbox helper binary was found, but is not configured correctly.
+You need to make sure that ~/.local/opt/lclip/chrome-sandbox (or /opt/lclip/chrome-sandbox) is owned by root and has mode 4755.
 ```
 
-The permission display should begin with `-rwsr-xr-x` and show owner and group `root root`. Mode `4755` means the owner can execute the helper with the owner's identity while other users can only read and execute it.
+**What `chrome-sandbox` is:**
+`chrome-sandbox` is a setuid root helper binary compiled by Chromium for Linux systems where unprivileged user namespaces are unavailable.
 
-**Permanent installer solution:** After moving the application into `/opt/lclip`, the installer changes the entire bundle to `root:root` ownership and explicitly applies mode `4755` to `chrome-sandbox`.
+**Why Electron requires the correct permissions:**
+If Chromium detects a `chrome-sandbox` binary in its application directory, Chromium's security layer strictly requires that the helper is owned by `root:root` with setuid permissions (`mode 4755`, `-rwsr-xr-x`). If the binary exists but is owned by a regular user (which happens when an archive is extracted by a non-root user), Chromium detects an insecure helper configuration and aborts with this fatal error.
 
-Do not work around this error with `--no-sandbox`, and do not apply `chmod 777`. Disabling Chromium's sandbox weakens LClip's renderer security; world-writable sandbox files are unsafe.
+**How the installers configure sandboxing:**
+- **Portable installer (`install-lclip.sh`)**: The portable installer operates without root privileges. It removes `chrome-sandbox` from `~/.local/opt/lclip/`. When this binary is absent, Chromium automatically uses the Linux kernel's standard **unprivileged user namespaces sandbox** (`CLONE_NEWUSER`). This keeps Electron renderer sandboxing fully active without requiring `sudo` or setuid helpers.
+- **System installer (`scripts/install-system.sh`)**: The system installer runs with `sudo` and installs to `/opt/lclip/`. It changes the bundle ownership to `root:root` and applies mode `4755` to `/opt/lclip/chrome-sandbox`.
+
+**Diagnosis and Resolution:**
+
+1. **If using the portable installation (`~/.local/opt/lclip`):**
+   Ensure `chrome-sandbox` is removed so Electron uses user namespaces:
+   ```bash
+   rm -f ~/.local/opt/lclip/chrome-sandbox
+   ~/.local/bin/lclip --show
+   ```
+   Or rerun the official portable installer:
+   ```bash
+   ./install-lclip.sh
+   ```
+
+2. **If your Linux kernel restricts unprivileged user namespaces:**
+   Some hardened Linux systems or kernels with `kernel.unprivileged_userns_clone=0` or strict AppArmor restrictions may require either:
+   - Enabling unprivileged user namespaces:
+     ```bash
+     sudo sysctl -w kernel.unprivileged_userns_clone=1
+     ```
+   - Or using the system installation, which sets up the root-owned SUID helper in `/opt/lclip`:
+     ```bash
+     ./scripts/install-system.sh
+     ```
+   - Or setting setuid root permissions on the portable helper if you choose to keep it:
+     ```bash
+     sudo chown root:root ~/.local/opt/lclip/chrome-sandbox
+     sudo chmod 4755 ~/.local/opt/lclip/chrome-sandbox
+     ```
+
+3. **If using the system installation (`/opt/lclip`):**
+   Fix ownership and permissions on the system helper:
+   ```bash
+   sudo chown root:root /opt/lclip/chrome-sandbox
+   sudo chmod 4755 /opt/lclip/chrome-sandbox
+   ls -l /opt/lclip/chrome-sandbox
+   /usr/local/bin/lclip --show
+   ```
+
+> [!WARNING]
+> Do NOT work around this error by running `lclip --no-sandbox`. Disabling Chromium's sandbox disables renderer process isolation and exposes your system to security risks. Do NOT run the entire LClip application as root.
 
 ### `Lclip virtual environment python not found at .../.venv/bin/python3`
 
@@ -411,16 +449,31 @@ If every launch is cold, inspect whether a desktop cleanup tool is killing backg
 
 ### `Super + .` does not open LClip
 
-First confirm LClip is running:
+First, check launcher and process status:
 
 ```bash
+which lclip || type -a lclip
+ls -l ~/.local/bin/lclip /usr/local/bin/lclip 2>/dev/null || true
 pgrep -a lclip
 lclip --show
 ```
 
+If on GNOME, inspect the native custom keybindings:
+
+```bash
+gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings
+gsettings get org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/ name 2>/dev/null || true
+gsettings get org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/ command 2>/dev/null || true
+gsettings get org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/ binding 2>/dev/null || true
+```
+
+**Understanding the launcher paths:**
+- **Portable user installation**: The launcher is `~/.local/bin/lclip`. The GNOME custom shortcut command is `~/.local/bin/lclip --show` (or `${HOME}/.local/bin/lclip --show`).
+- **System installation**: The launcher is `/usr/local/bin/lclip`. The GNOME custom shortcut command is `/usr/local/bin/lclip --show`.
+
 Then open LClip Settings and read the integration card. If it says “Shortcut unavailable”, likely causes are:
 
-- the desktop or another application already owns `Super + .`;
+- the desktop or another application already owns `Super + .` (e.g. standard GNOME emoji shortcut or another custom keybinding);
 - the Wayland shortcut portal is unavailable or denied;
 - an Electron/portal combination does not support the request;
 - the keyboard layout maps the period key differently;
@@ -428,21 +481,17 @@ Then open LClip Settings and read the integration card. If it says “Shortcut u
 
 **Solutions:**
 
-1. Search the desktop's keyboard-shortcut settings for `Super + .` and remove the conflict.
-2. Restart LClip from inside the graphical session.
-3. Log out and back in after portal or desktop updates.
-4. On GNOME/KDE Wayland, ensure the distribution's XDG Desktop Portal and correct desktop backend are installed and running.
-5. If the portal presents a one-time request, approve only the declared `Super + .` shortcut.
-
-LClip intentionally does not fall back to `Super+V`, `Ctrl+V`, or another chord.
-
-On GNOME, the system installer also creates a native custom shortcut whose command is `/usr/local/bin/lclip --show` and whose binding is `<Super>period`. This provides an operating-system binding when Electron's Wayland portal registration is unavailable. Reinstall from an active GNOME session to configure it, or run:
-
-```bash
-node scripts/configure-gnome-shortcut.mjs
-```
-
-On KDE Wayland, approve the Global Shortcuts portal request if it appears. On XFCE, Cinnamon, MATE, LXQt, or a compositor without the portal, create a manual keyboard shortcut with command `/usr/local/bin/lclip --show` and binding `Super + .`. This difference is controlled by the desktop environment, not by whether the distribution is Ubuntu, Fedora, Debian, Arch, or openSUSE.
+1. **Check for shortcut conflicts:** Search the desktop's keyboard-shortcut settings (in GNOME: **Settings → Keyboard → Keyboard Shortcuts → Custom Shortcuts**) for `Super + .`. If another action uses it, reassign or remove that shortcut.
+2. **Re-apply the shortcut configuration:**
+   - For portable installations: rerun `./install-lclip.sh`
+   - For system installations: run `node scripts/configure-gnome-shortcut.mjs --command "/usr/local/bin/lclip --show"`
+3. **Restart LClip from inside the graphical session:**
+   ```bash
+   pkill -x lclip
+   lclip --show
+   ```
+4. **On KDE Wayland**, approve the Global Shortcuts portal request if it appears.
+5. **On XFCE, Cinnamon, MATE, LXQt, or other Wayland compositors**, create a manual keyboard shortcut in desktop settings with command `~/.local/bin/lclip --show` (portable) or `/usr/local/bin/lclip --show` (system) and binding `Super + .`.
 
 ### GitHub or email does not open from Settings
 

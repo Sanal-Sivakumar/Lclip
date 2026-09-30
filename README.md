@@ -74,7 +74,7 @@ At startup, LClip asks Electron and the Linux desktop to register `Super + .` as
 - On Wayland, the request can be handled through the desktop's Global Shortcuts portal. Depending on the desktop and its security policy, a one-time approval dialog may appear.
 - If the chord is already owned by the desktop or another application, LClip shows the conflict in Settings and does not substitute another shortcut.
 
-On GNOME, the installer also creates a native desktop custom shortcut for the same `Super + .` chord. It executes `/usr/local/bin/lclip --show`, so the shortcut remains available even when Electron's Wayland portal registration is unavailable. It does not create `Super+V`, `Ctrl+V`, or any alternative binding.
+On GNOME, the installer also creates a native desktop custom shortcut for the same `Super + .` chord (`~/.local/bin/lclip --show` for portable user installations, and `/usr/local/bin/lclip --show` for system installations). This ensures the shortcut remains available even when Electron's Wayland portal registration is unavailable. It does not create `Super+V`, `Ctrl+V`, or any alternative binding.
 
 Every fresh `Super + .` opening starts on **Clipboard history**, clears the previous search/category selection, closes Settings if necessary, and scrolls History to the top. The automatic reopen that follows a paste is part of the current interaction and does not perform this reset.
 
@@ -82,12 +82,12 @@ Shortcut support follows the desktop environment rather than the distribution na
 
 | Linux desktop/session | Shortcut integration |
 |---|---|
-| GNOME on Ubuntu, Fedora, Debian, Arch, openSUSE, or another distribution | Installer creates the native GNOME custom shortcut through `gsettings`; Electron registration remains as a second path |
+| GNOME on Ubuntu, Fedora, Debian, Arch, openSUSE, or another distribution | Installer automatically configures the native GNOME custom shortcut through `gsettings` (`~/.local/bin/lclip --show` for portable installations, `/usr/local/bin/lclip --show` for system installations); Electron registration remains as a second path |
 | KDE Plasma on Kubuntu, Fedora KDE, KDE neon, openSUSE, Arch, or another distribution | Electron requests `Super + .` through the Wayland Global Shortcuts portal; KDE may show a one-time approval |
 | X11 desktops including XFCE, Cinnamon, MATE, LXQt, GNOME Xorg, and Plasma X11 | Electron normally registers `Super + .` directly with X11 |
-| Other Wayland compositors | Works when their XDG Desktop Portal supports global shortcuts; otherwise add `/usr/local/bin/lclip --show` manually in the desktop's keyboard-shortcut settings |
+| Other Wayland compositors | Works when their XDG Desktop Portal supports global shortcuts; otherwise add `~/.local/bin/lclip --show` (portable) or `/usr/local/bin/lclip --show` (system) manually in the desktop's keyboard-shortcut settings |
 
-The installer and autostart files support common Debian/Ubuntu, Fedora/RHEL, Arch, and openSUSE families. A desktop-specific shortcut conflict can still require manual removal of the existing binding.
+The installer and autostart files support common Debian/Ubuntu, Fedora/RHEL, Arch, and openSUSE families. If another shortcut already uses `Super + .`, the installer reports the conflict clearly without overwriting your existing binding.
 
 ### Selecting and pasting an item
 
@@ -127,9 +127,11 @@ The stable prebuilt release does **not** require Node.js, npm, root access, or F
 
 ## Download and install
 
-### Recommended: no-root portable installer
+### Recommended: no-root portable installer (for users without development repo)
 
-This is the smoothest option across Ubuntu, Debian, Fedora, openSUSE, Arch, Mint, Pop!_OS, elementary OS, and other current 64-bit glibc distributions. It detects x86-64 or ARM64, downloads the matching portable archive, verifies `SHA256SUMS`, installs below `~/.local`, creates the application-menu and login entries, and restores the previous user installation if activation fails.
+This is the standard and recommended installation method for all users across Ubuntu, Debian, Fedora, openSUSE, Arch, Mint, Pop!_OS, elementary OS, and other current 64-bit glibc distributions. **If you do not have the development repository, this is the installer to use.**
+
+It requires no `sudo` or root permissions, no Node.js, and no FUSE. It automatically detects your machine architecture (x86-64 or ARM64), downloads the official release, verifies `SHA256SUMS`, installs to `~/.local/opt/lclip`, creates the launcher `~/.local/bin/lclip`, configures application-menu and autostart entries, automatically configures the user-level GNOME `Super + .` shortcut on GNOME desktops, and rolls back cleanly if activation fails.
 
 ```bash
 mkdir -p ~/Downloads/lclip-install
@@ -140,7 +142,7 @@ chmod +x install-lclip.sh
 ./install-lclip.sh
 ```
 
-If `curl` is unavailable, use:
+If `curl` is unavailable, use `wget`:
 
 ```bash
 wget https://github.com/Sanal-Sivakumar/Lclip/releases/latest/download/install-lclip.sh
@@ -149,6 +151,9 @@ chmod +x install-lclip.sh
 ```
 
 The installer requires only `curl` or `wget`, `tar`, and `sha256sum`. Run `./install-lclip.sh --help` for a custom prefix, a specific version, or installation without login autostart.
+
+**Electron Sandboxing in Portable Installations:**
+Portable installations use Chromium's unprivileged Linux user namespaces sandbox (`CLONE_NEWUSER`). This provides full process isolation and renderer sandboxing with zero root permissions and without requiring setuid helpers.
 
 ### Direct stable downloads
 
@@ -201,9 +206,9 @@ Prebuilt packages provide the app, menu entry, Electron shortcut path, and LClip
 
 ## First run
 
-1. Open **LClip** from the application menu. If `~/.local/bin` is in `PATH`, `lclip --show` works too.
+1. Open **LClip** from the application menu or press `Super + .`. If `~/.local/bin` is in `PATH`, running `lclip --show` (or `~/.local/bin/lclip --show`) works directly.
 2. Open Settings and confirm the separate Electron, portal, GNOME-native, login-startup, paste-bridge, and local-storage rows.
-3. Press `Super + .`. A Wayland desktop may ask once for shortcut approval. If registration is unavailable, create a desktop shortcut pointing to `~/.local/bin/lclip --show`.
+3. On GNOME, the installer configures the `Super + .` shortcut automatically. On other compositors without portal support, add `~/.local/bin/lclip --show` (or `/usr/local/bin/lclip --show` for system installations) in the desktop's keyboard shortcut settings.
 4. Copy two ordinary text values with `Ctrl+C`; open LClip and select the older value.
 5. If automatic paste is unavailable, the value is still on the clipboard—focus the target and press `Ctrl+V`.
 6. Run the guided desktop check with `bash scripts/smoke-linux.sh` from a source checkout when qualifying a machine or release.
@@ -335,9 +340,9 @@ LClip will still copy selected values to the clipboard. Until a supported bridge
 LClip uses two compatible registration paths:
 
 1. **Electron global shortcut** — direct registration on X11 or the Global Shortcuts portal on compatible Wayland desktops.
-2. **GNOME native shortcut** — installed through `gsettings` with command `/usr/local/bin/lclip --show` and binding `<Super>period`.
+2. **GNOME native shortcut** — configured through `gsettings` with command `~/.local/bin/lclip --show` (portable user installation) or `/usr/local/bin/lclip --show` (system installation) and binding `<Super>period`.
 
-The native GNOME shortcut is created by `scripts/configure-gnome-shortcut.mjs`. Existing GNOME custom shortcuts are preserved. The uninstaller removes only LClip's entry.
+The native GNOME shortcut is configured automatically by both the portable and system installers. Existing GNOME custom shortcuts are preserved without destructive overwrites. If `Super + .` is already assigned to another shortcut, the installer notices and leaves your existing shortcut intact. The uninstaller removes only LClip's entry.
 
 Verify the GNOME entry with:
 
@@ -469,7 +474,8 @@ See [technical_details.md](technical_details.md) for a beginner-friendly explana
 - History is local and capped at 10 text entries.
 - State is written with user-only file permissions (`0600`) inside a user-only directory (`0700`).
 - LClip registers one global chord and does not record arbitrary keyboard input.
-- The UI has Node.js integration disabled, context isolation enabled, and Electron sandboxing enabled.
+- The UI has Node.js integration disabled, context isolation enabled, and Electron sandboxing strictly enabled.
+- Portable installations use Chromium's unprivileged user namespaces sandbox (`CLONE_NEWUSER`); system installations use root-owned mode `4755` SUID sandboxing. Never pass `--no-sandbox` and never run LClip as root.
 - A restrictive Content Security Policy blocks arbitrary scripts, objects, navigation, and renderer network connections.
 - External links are limited to official GIPHY pages and open in the system browser.
 - GIPHY is optional; history, emoji, kaomoji, and symbols work offline.

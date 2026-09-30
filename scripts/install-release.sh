@@ -166,6 +166,11 @@ mv "$RUNTIME_ROOT" "$NEW_DIR"
 mkdir -p "$NEW_DIR/resources"
 printf 'v%s\n' "$RELEASE_VERSION" >"$NEW_DIR/resources/LCLIP_PORTABLE_INSTALL"
 chmod 0755 "$NEW_DIR/lclip"
+# In portable user installations, remove chrome-sandbox if present.
+# Chromium uses the standard Linux unprivileged user namespaces sandbox (CLONE_NEWUSER)
+# without requiring root permissions. Leaving a non-root chrome-sandbox causes Chromium's
+# setuid sandbox check to fail with a fatal error.
+rm -f "$NEW_DIR/chrome-sandbox"
 
 mkdir -p "$(dirname "$DESKTOP_FILE")" "$(dirname "$ICON_FILE")" "$(dirname "$AUTOSTART_FILE")"
 backup_file "$LAUNCHER" launcher
@@ -239,6 +244,52 @@ chmod 0600 "$AUTOSTART_FILE"
 command -v update-desktop-database >/dev/null && update-desktop-database "$(dirname "$DESKTOP_FILE")" >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true
 
+DESKTOP_NAME="${XDG_CURRENT_DESKTOP:-}"
+if [[ "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null 2>&1; then
+  ROOT_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
+  BINDING_SCHEMA="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
+  BINDING_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/"
+  CURRENT_BINDINGS="$(gsettings get "$ROOT_SCHEMA" custom-keybindings 2>/dev/null || echo "@as []")"
+  EXISTING_PATHS="$(grep -o "'[^']*'" <<<"$CURRENT_BINDINGS" | tr -d "'" || true)"
+
+  SHORTCUT_CONFLICT=0
+  for path in $EXISTING_PATHS; do
+    if [[ "$path" != "$BINDING_PATH" ]]; then
+      b="$(gsettings get "$BINDING_SCHEMA:$path" binding 2>/dev/null | tr -d "'" || true)"
+      if [[ "$b" == "<Super>period" ]]; then
+        n="$(gsettings get "$BINDING_SCHEMA:$path" name 2>/dev/null | tr -d "'" || true)"
+        c="$(gsettings get "$BINDING_SCHEMA:$path" command 2>/dev/null | tr -d "'" || true)"
+        if [[ "$n" != "LClip" && "$c" != *lclip* ]]; then
+          echo "Notice: Super + . is already assigned to GNOME shortcut '${n:-Unnamed}' ('${c:-none}')." >&2
+          echo "LClip did not overwrite it. To use Super + . for LClip, remove or change the existing shortcut in GNOME Settings -> Keyboard -> Keyboard Shortcuts." >&2
+          SHORTCUT_CONFLICT=1
+          break
+        fi
+      fi
+    fi
+  done
+
+  if [[ "$SHORTCUT_CONFLICT" -eq 0 ]]; then
+    gsettings set "$BINDING_SCHEMA:$BINDING_PATH" name "LClip" 2>/dev/null || true
+    gsettings set "$BINDING_SCHEMA:$BINDING_PATH" command "$LAUNCHER --show" 2>/dev/null || true
+    gsettings set "$BINDING_SCHEMA:$BINDING_PATH" binding "<Super>period" 2>/dev/null || true
+
+    NEXT_BINDINGS=()
+    FOUND_LCLIP=0
+    for path in $EXISTING_PATHS; do
+      if [[ "$path" == "$BINDING_PATH" ]]; then
+        FOUND_LCLIP=1
+      fi
+      NEXT_BINDINGS+=("'$path'")
+    done
+    if [[ "$FOUND_LCLIP" -eq 0 ]]; then
+      NEXT_BINDINGS+=("'$BINDING_PATH'")
+    fi
+    SERIALIZED="[$(printf "%s, " "${NEXT_BINDINGS[@]}" | sed 's/, $//')]"
+    gsettings set "$ROOT_SCHEMA" custom-keybindings "$SERIALIZED" 2>/dev/null || true
+  fi
+fi
+
 ROLLBACK_ACTIVE=0
 trap - ERR
 rm -rf "$ROLLBACK_DIR"
@@ -251,9 +302,10 @@ echo
 echo "LClip ${RELEASE_VERSION} is installed for this user."
 echo "  Application: $INSTALL_DIR"
 echo "  Command:     $LAUNCHER"
+echo "  Shortcut:    Super + ."
 echo "  Menu entry:  $DESKTOP_FILE"
 echo "  Autostart:   $([[ "$ENABLE_AUTOSTART" -eq 1 ]] && echo enabled || echo disabled)"
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
   echo "  PATH note: add $BIN_DIR to PATH to run 'lclip' from a terminal."
 fi
-echo "Open LClip from the application menu or press Super + . after shortcut registration succeeds."
+echo "Open LClip from the application menu or press Super + . to launch it."

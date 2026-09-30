@@ -350,7 +350,7 @@ command -v gtk-update-icon-cache >/dev/null && "${SUDO[@]}" gtk-update-icon-cach
 
 DESKTOP_NAME="${XDG_CURRENT_DESKTOP:-}"
 if [[ "${EUID}" -ne 0 && "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null; then
-  node "$PROJECT_DIR/scripts/configure-gnome-shortcut.mjs" || echo "GNOME shortcut setup failed; add /usr/local/bin/lclip --show in Keyboard Settings." >&2
+  node "$PROJECT_DIR/scripts/configure-gnome-shortcut.mjs" --command "/usr/local/bin/lclip --show" || echo "GNOME shortcut setup failed; add /usr/local/bin/lclip --show in Keyboard Settings." >&2
 fi
 
 ROLLBACK_ACTIVE=0

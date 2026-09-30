@@ -81,15 +81,15 @@ LClip enables Electron's `GlobalShortcutsPortal` and `GlobalShortcutsPortalPrefe
 
 ### GNOME native custom shortcut
 
-Electron's portal registration can be unavailable or rejected on some GNOME/Wayland combinations. During installation from an active GNOME session, `scripts/configure-gnome-shortcut.mjs` also uses GNOME's `gsettings` interface to create one native custom shortcut:
+Electron's portal registration can be unavailable or rejected on some GNOME/Wayland combinations. During installation from an active GNOME session, the installers use GNOME's `gsettings` interface to configure one native custom shortcut:
 
 ```text
 Name: LClip
-Command: /usr/local/bin/lclip --show
+Command: ~/.local/bin/lclip --show (portable) or /usr/local/bin/lclip --show (system)
 Binding: <Super>period
 ```
 
-The script reads the current custom-keybinding array, preserves every existing entry, and adds LClip's dedicated path. It never binds `Ctrl+V`, `Super+V`, or an alternative chord. The uninstaller removes only LClip's binding path. Electron registration and the GNOME command can both call `showWindow`; repeated show requests are idempotent and do not toggle the picker closed. A fresh external show emits `lclip:open`, which selects Clipboard History, clears Search and category state, closes Settings, resets keyboard selection, and scrolls History to the top.
+The configuration reads the current custom-keybinding array, preserves every existing entry, and adds LClip's dedicated path (`/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/`). If another shortcut already uses `Super + .`, the installer reports the conflict without destroying existing bindings. It never binds `Ctrl+V`, `Super+V`, or an alternative chord. The uninstaller removes only LClip's binding path. Electron registration and the GNOME command can both call `showWindow`; repeated show requests are idempotent and do not toggle the picker closed. A fresh external show emits `lclip:open`, which selects Clipboard History, clears Search and category state, closes Settings, resets keyboard selection, and scrolls History to the top.
 
 ### Clipboard and selection
 
@@ -357,7 +357,11 @@ Read, parse, permission, and write failures are exposed through the Settings sto
 
 `sandbox: true` applies Chromium renderer sandbox restrictions. The main process remains privileged enough to use Electron desktop APIs, so it must validate renderer requests.
 
-Linux Electron bundles contain a helper named `chrome-sandbox`. For the set-user-ID sandbox path to be accepted, the installed helper must be owned by `root:root` and have mode `4755`. The system installer changes the complete `/opt/lclip` bundle to root ownership and explicitly applies `4755` to this helper. Running with `--no-sandbox` is not an acceptable replacement.
+On Linux, Chromium provides two Layer-1 sandbox mechanisms:
+1. **Unprivileged User Namespaces Sandbox (`CLONE_NEWUSER`)**: The portable no-root installer (`install-lclip.sh`) removes `chrome-sandbox` so Chromium uses user namespaces. This allows full renderer process isolation without requiring `sudo` or setuid helpers.
+2. **SUID Sandbox Helper (`chrome-sandbox`)**: For system-wide installations under `/opt/lclip`, the system installer configures `/opt/lclip/chrome-sandbox` with `root:root` ownership and mode `4755` (`-rwsr-xr-x`).
+
+Running with `--no-sandbox` weakens process isolation and is not an acceptable replacement. Running the entire LClip application as root is unsafe.
 
 ### Node integration
 

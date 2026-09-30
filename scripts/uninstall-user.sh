@@ -48,6 +48,30 @@ if [[ -f "$AUTOSTART_FILE" ]] && grep -q '^X-LClip-Managed=true$' "$AUTOSTART_FI
 rm -f "$ICON_FILE"
 
 command -v update-desktop-database >/dev/null && update-desktop-database "$(dirname "$DESKTOP_FILE")" >/dev/null 2>&1 || true
+
+DESKTOP_NAME="${XDG_CURRENT_DESKTOP:-}"
+if [[ "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null 2>&1; then
+  ROOT_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
+  BINDING_SCHEMA="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
+  BINDING_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/"
+  CURRENT_BINDINGS="$(gsettings get "$ROOT_SCHEMA" custom-keybindings 2>/dev/null || echo "@as []")"
+  EXISTING_PATHS="$(grep -o "'[^']*'" <<<"$CURRENT_BINDINGS" | tr -d "'" || true)"
+
+  NEXT_BINDINGS=()
+  for path in $EXISTING_PATHS; do
+    if [[ "$path" != "$BINDING_PATH" ]]; then
+      NEXT_BINDINGS+=("'$path'")
+    fi
+  done
+  if [[ ${#NEXT_BINDINGS[@]} -eq 0 ]]; then
+    SERIALIZED="@as []"
+  else
+    SERIALIZED="[$(printf "%s, " "${NEXT_BINDINGS[@]}" | sed 's/, $//')]"
+  fi
+  gsettings set "$ROOT_SCHEMA" custom-keybindings "$SERIALIZED" 2>/dev/null || true
+  gsettings reset-recursively "$BINDING_SCHEMA:$BINDING_PATH" 2>/dev/null || true
+fi
+
 if [[ "$PURGE_DATA" -eq 1 ]]; then rm -rf "$CONFIG_HOME/LClip"; fi
 
 echo "The per-user LClip installation was removed."

@@ -34,3 +34,66 @@ test("GNOME native detection verifies the exact command and binding", async () =
   assert.equal(missing.configured, false);
   assert.equal(missing.label, "GNOME shortcut command is missing");
 });
+
+test("GNOME native detection verifies portable launcher command and binding", async () => {
+  let accessed = "";
+  const run = async (_command, args) => {
+    if (args.at(-1) === "custom-keybindings") return { stdout: "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/']" };
+    if (args.at(-1) === "command") return { stdout: "'~/.local/bin/lclip --show'" };
+    return { stdout: "'<Super>period'" };
+  };
+  const result = await detectGnomeNativeShortcut({
+    platform: "linux",
+    env: { XDG_CURRENT_DESKTOP: "GNOME", HOME: "/home/testuser" },
+    run,
+    accessFile: async (path) => {
+      accessed = path;
+    }
+  });
+  assert.equal(accessed, "/home/testuser/.local/bin/lclip");
+  assert.equal(result.configured, true);
+  assert.equal(result.label, "GNOME native shortcut configured");
+});
+
+test("GNOME native detection checks custom keybinding paths when lclip path is not present", async () => {
+  const run = async (_command, args) => {
+    if (args.at(-1) === "custom-keybindings") return { stdout: "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/']" };
+    if (args.at(-1) === "command") return { stdout: "'/home/testuser/.local/bin/lclip --show'" };
+    return { stdout: "'<Super>period'" };
+  };
+  const result = await detectGnomeNativeShortcut({
+    platform: "linux",
+    env: { XDG_CURRENT_DESKTOP: "GNOME", HOME: "/home/testuser" },
+    run,
+    accessFile: async () => {}
+  });
+  assert.equal(result.configured, true);
+  assert.equal(result.label, "GNOME native shortcut configured");
+});
+
+test("GNOME native detection returns not configured when binding is missing or empty", async () => {
+  const run = async () => ({ stdout: "@as []" });
+  const result = await detectGnomeNativeShortcut({
+    platform: "linux",
+    env: { XDG_CURRENT_DESKTOP: "GNOME" },
+    run
+  });
+  assert.equal(result.configured, false);
+  assert.equal(result.label, "GNOME shortcut not configured");
+});
+
+test("GNOME native detection returns differs when binding chord does not match Super + .", async () => {
+  const run = async (_command, args) => {
+    if (args.at(-1) === "custom-keybindings") return { stdout: "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/lclip/']" };
+    if (args.at(-1) === "command") return { stdout: "'/usr/local/bin/lclip --show'" };
+    return { stdout: "'<Super>v'" };
+  };
+  const result = await detectGnomeNativeShortcut({
+    platform: "linux",
+    env: { XDG_CURRENT_DESKTOP: "GNOME" },
+    run,
+    accessFile: async () => {}
+  });
+  assert.equal(result.configured, false);
+  assert.equal(result.label, "GNOME shortcut differs from the LClip binding");
+});
