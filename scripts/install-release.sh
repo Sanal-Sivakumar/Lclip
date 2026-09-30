@@ -243,6 +243,10 @@ if [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]]; then
     USER_SERVICE_DIR="$CONFIG_HOME/systemd/user"
     mkdir -p "$USER_SERVICE_DIR"
     YDOTOOLD_PATH="$(command -v ydotoold)"
+    EXEC_START="$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666"
+    if command -v sg >/dev/null 2>&1 && getent group lclip-uinput >/dev/null 2>&1; then
+      EXEC_START="/usr/bin/sg lclip-uinput -c \"$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666\""
+    fi
     cat >"$USER_SERVICE_DIR/lclip-ydotoold.service" <<EOF
 [Unit]
 Description=LClip ydotool input daemon
@@ -251,8 +255,8 @@ ConditionPathExists=/dev/uinput
 
 [Service]
 Type=simple
-ExecStart=$YDOTOOLD_PATH
-Restart=on-failure
+ExecStart=$EXEC_START
+Restart=always
 RestartSec=2
 
 [Install]
@@ -265,7 +269,7 @@ EOF
   fi
 fi
 
-printf '#!/bin/sh\nAPP=%q\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
+printf '#!/bin/sh\nunset ELECTRON_RUN_AS_NODE\nAPP=%q\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
 chmod 0755 "$LAUNCHER"
 cp "$WORK_DIR/$ICON_NAME" "$ICON_FILE"
 chmod 0644 "$ICON_FILE"

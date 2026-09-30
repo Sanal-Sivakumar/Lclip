@@ -207,6 +207,7 @@ AUTOSTART="$WORK_DIR/io.lclip.LClip.autostart.desktop"
 
 cat >"$LAUNCHER" <<'EOF'
 #!/bin/sh
+unset ELECTRON_RUN_AS_NODE
 if [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then
   exec /opt/lclip/lclip --ozone-platform=x11 "$@"
 fi
@@ -319,6 +320,10 @@ EOF
   USER_SERVICE_DIR="$HOME/.config/systemd/user"
   install -d -m 0700 "$USER_SERVICE_DIR"
   YDOTOOL_SERVICE="$WORK_DIR/lclip-ydotoold.service"
+  EXEC_START="$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666"
+  if command -v sg >/dev/null 2>&1 && getent group lclip-uinput >/dev/null 2>&1; then
+    EXEC_START="/usr/bin/sg lclip-uinput -c \"$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666\""
+  fi
   cat >"$YDOTOOL_SERVICE" <<EOF
 [Unit]
 Description=LClip ydotool input daemon
@@ -327,8 +332,8 @@ ConditionPathExists=/dev/uinput
 
 [Service]
 Type=simple
-ExecStart=$YDOTOOLD_PATH
-Restart=on-failure
+ExecStart=$EXEC_START
+Restart=always
 RestartSec=2
 
 [Install]

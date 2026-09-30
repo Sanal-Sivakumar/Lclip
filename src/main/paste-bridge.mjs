@@ -57,20 +57,39 @@ export async function detectPasteBridge(env = process.env, platform = process.pl
   return { id: "unavailable", label: "Copy only · input bridge missing", automatic: false };
 }
 
-export async function pasteWithBridge(bridge) {
+export async function pasteWithBridge(bridge, env = process.env) {
   if (!bridge?.automatic || !bridge.command) return false;
-  const options = { timeout: 2500, windowsHide: true };
+  const socketCandidates = [
+    env.YDOTOOL_SOCKET,
+    "/tmp/.ydotool_socket",
+    env.XDG_RUNTIME_DIR ? `${env.XDG_RUNTIME_DIR}/.ydotool_socket` : undefined
+  ].filter(Boolean);
+
   for (const candidate of bridge.candidates || [bridge]) {
     try {
       if (candidate.id === "ydotool") {
         const keys = candidate.syntax === "legacy-symbolic"
           ? ["key", "ctrl+v"]
           : ["key", "29:1", "47:1", "47:0", "29:0"];
-        await run(candidate.command, keys, options);
+        let success = false;
+        for (const socketPath of socketCandidates) {
+          try {
+            await run(candidate.command, keys, {
+              timeout: 2500,
+              windowsHide: true,
+              env: { ...env, YDOTOOL_SOCKET: socketPath }
+            });
+            success = true;
+            break;
+          } catch {}
+        }
+        if (!success) {
+          await run(candidate.command, keys, { timeout: 2500, windowsHide: true, env });
+        }
       } else if (candidate.id === "wtype") {
-        await run(candidate.command, ["-M", "ctrl", "v", "-m", "ctrl"], options);
+        await run(candidate.command, ["-M", "ctrl", "v", "-m", "ctrl"], { timeout: 2500, windowsHide: true, env });
       } else if (candidate.id === "xdotool") {
-        await run(candidate.command, ["key", "--clearmodifiers", "ctrl+v"], options);
+        await run(candidate.command, ["key", "--clearmodifiers", "ctrl+v"], { timeout: 2500, windowsHide: true, env });
       } else {
         continue;
       }

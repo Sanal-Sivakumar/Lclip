@@ -186,10 +186,6 @@ function showWindow() {
   revealWindow(true);
 }
 
-function restoreWindowAfterPaste() {
-  revealWindow(false);
-}
-
 function toggleWindow() {
   if (window?.isVisible()) window.hide();
   else showWindow();
@@ -219,7 +215,6 @@ function startClipboardMonitor() {
 }
 
 async function pasteIntoPreviousApp(waitMilliseconds) {
-  const reopenPicker = Boolean(window?.isVisible());
   activationInProgress = true;
   window?.hide();
   try {
@@ -228,7 +223,6 @@ async function pasteIntoPreviousApp(waitMilliseconds) {
   } finally {
     await delay(80);
     activationInProgress = false;
-    if (reopenPicker) restoreWindowAfterPaste();
   }
 }
 
