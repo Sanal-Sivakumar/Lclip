@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPOSITORY="${LCLIP_REPOSITORY:-Sanal-Sivakumar/Lclip}"
-RELEASE_VERSION="${LCLIP_VERSION:-1.0.1}"
+RELEASE_VERSION="${LCLIP_VERSION:-1.0.2}"
 PREFIX="${LCLIP_PREFIX:-$HOME/.local}"
 ENABLE_AUTOSTART=1
 
@@ -13,7 +13,7 @@ Install the official LClip portable Linux release for the current user.
 Usage: ./install-lclip.sh [options]
 
 Options:
-  --release VERSION  Install a specific release (default: 1.0.1)
+  --release VERSION  Install a specific release (default: 1.0.2)
   --prefix PATH      Install below PATH (default: ~/.local)
   --no-autostart     Do not start LClip automatically after graphical login
   --help             Show this help

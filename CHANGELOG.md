@@ -2,6 +2,15 @@
 
 All notable LClip changes are documented here. The project follows semantic versioning and publishes immutable tagged releases.
 
+## [1.0.2] - 2026-09-30
+
+### Fixed
+
+- Configure `root:root 4755` SUID sandbox helper permissions automatically via `sudo` in the portable installer on Linux systems restricting unprivileged user namespaces.
+- Fix GNOME native custom shortcut registration in the portable installer to point to `~/.local/bin/lclip --show`.
+- Add CLI argument support and non-destructive shortcut collision detection to `scripts/configure-gnome-shortcut.mjs`.
+- Update runtime status and documentation across README, troubleshooting, and technical details.
+
 ## [1.0.1] - 2026-07-23
 
 ### Fixed
