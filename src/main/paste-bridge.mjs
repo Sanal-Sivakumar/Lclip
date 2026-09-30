@@ -52,7 +52,7 @@ export async function detectPasteBridge(env = process.env, platform = process.pl
     });
   }
   if (session === "wayland" && wtype) candidates.push({ id: "wtype", command: wtype, label: "Paste bridge available · Wayland", automatic: true });
-  if (xdotool) candidates.push({ id: "xdotool", command: xdotool, label: session === "wayland" ? "Paste bridge available · Xwayland" : "Paste bridge available · X11", automatic: true });
+  if (session !== "wayland" && xdotool) candidates.push({ id: "xdotool", command: xdotool, label: "Paste bridge available · X11", automatic: true });
   if (candidates.length) return { ...candidates[0], candidates };
   return { id: "unavailable", label: "Copy only · input bridge missing", automatic: false };
 }

@@ -94,3 +94,15 @@ test("ydotool 1.x uses explicit keycode press and release events", async () => {
   assert.equal(bridge.syntax, "keycodes");
   assert.equal(await pasteWithBridge(bridge), true);
 });
+
+test("xdotool is used on X11 but excluded on Wayland", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lclip-"));
+  await fakeExecutable(directory, "xdotool");
+  const x11Bridge = await detectPasteBridge({ PATH: directory, XDG_SESSION_TYPE: "x11" }, "linux");
+  assert.equal(x11Bridge.id, "xdotool");
+  assert.equal(x11Bridge.automatic, true);
+
+  const waylandBridge = await detectPasteBridge({ PATH: directory, XDG_SESSION_TYPE: "wayland" }, "linux");
+  assert.equal(waylandBridge.id, "unavailable");
+  assert.equal(waylandBridge.automatic, false);
+});
