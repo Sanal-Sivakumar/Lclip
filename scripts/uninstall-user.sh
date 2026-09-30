@@ -45,7 +45,13 @@ rm -rf "$INSTALL_DIR"
 if [[ -f "$LAUNCHER" ]] && grep -Fq "$PREFIX/opt/lclip/lclip" "$LAUNCHER"; then rm -f "$LAUNCHER"; fi
 if [[ -f "$DESKTOP_FILE" ]] && grep -q '^X-LClip-Managed=true$' "$DESKTOP_FILE"; then rm -f "$DESKTOP_FILE"; fi
 if [[ -f "$AUTOSTART_FILE" ]] && grep -q '^X-LClip-Managed=true$' "$AUTOSTART_FILE"; then rm -f "$AUTOSTART_FILE"; fi
-rm -f "$ICON_FILE"
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user disable --now lclip-ydotoold.service >/dev/null 2>&1 || true
+fi
+rm -f "$CONFIG_HOME/systemd/user/lclip-ydotoold.service"
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+fi
 
 command -v update-desktop-database >/dev/null && update-desktop-database "$(dirname "$DESKTOP_FILE")" >/dev/null 2>&1 || true
 

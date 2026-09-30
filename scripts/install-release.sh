@@ -202,6 +202,69 @@ if [[ -f "$INSTALL_DIR/chrome-sandbox" ]]; then
   fi
 fi
 
+install_bridge_package() {
+  local package="$1"
+  if command -v apt-get >/dev/null 2>&1 && apt-cache show "$package" >/dev/null 2>&1; then
+    sudo apt-get install -y "$package" >/dev/null 2>&1 || true
+  elif command -v dnf >/dev/null 2>&1 && dnf -q info "$package" >/dev/null 2>&1; then
+    sudo dnf install -y "$package" >/dev/null 2>&1 || true
+  elif command -v pacman >/dev/null 2>&1 && pacman -Si "$package" >/dev/null 2>&1; then
+    sudo pacman -S --needed --noconfirm "$package" >/dev/null 2>&1 || true
+  elif command -v zypper >/dev/null 2>&1 && zypper --non-interactive info "$package" >/dev/null 2>&1; then
+    sudo zypper --non-interactive install "$package" >/dev/null 2>&1 || true
+  fi
+}
+
+if command -v sudo >/dev/null 2>&1; then
+  if ! command -v ydotool >/dev/null 2>&1; then install_bridge_package ydotool; fi
+  if ! command -v ydotoold >/dev/null 2>&1; then install_bridge_package ydotoold; fi
+fi
+
+LOGIN_USER="${USER:-}"
+if [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]]; then
+  if command -v sudo >/dev/null 2>&1; then
+    sudo groupadd --system --force lclip-uinput >/dev/null 2>&1 || true
+    sudo usermod -aG lclip-uinput "$LOGIN_USER" >/dev/null 2>&1 || true
+    if [[ ! -f /etc/udev/rules.d/80-lclip-uinput.rules ]]; then
+      echo 'KERNEL=="uinput", GROUP="lclip-uinput", MODE="0660", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/80-lclip-uinput.rules >/dev/null 2>&1 || true
+      printf 'uinput\n' | sudo tee /etc/modules-load.d/lclip-uinput.conf >/dev/null 2>&1 || true
+      sudo modprobe uinput >/dev/null 2>&1 || true
+      if command -v udevadm >/dev/null 2>&1; then
+        sudo udevadm control --reload-rules >/dev/null 2>&1 || true
+        sudo udevadm trigger --name-match=uinput >/dev/null 2>&1 || true
+      fi
+    fi
+    if [[ -e /dev/uinput ]]; then
+      sudo chgrp lclip-uinput /dev/uinput >/dev/null 2>&1 || true
+      sudo chmod 0660 /dev/uinput >/dev/null 2>&1 || true
+    fi
+  fi
+  if command -v ydotoold >/dev/null 2>&1; then
+    USER_SERVICE_DIR="$CONFIG_HOME/systemd/user"
+    mkdir -p "$USER_SERVICE_DIR"
+    YDOTOOLD_PATH="$(command -v ydotoold)"
+    cat >"$USER_SERVICE_DIR/lclip-ydotoold.service" <<EOF
+[Unit]
+Description=LClip ydotool input daemon
+Documentation=https://github.com/ReimuNotMoe/ydotool
+ConditionPathExists=/dev/uinput
+
+[Service]
+Type=simple
+ExecStart=$YDOTOOLD_PATH
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+EOF
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl --user daemon-reload >/dev/null 2>&1 || true
+      systemctl --user enable --now lclip-ydotoold.service >/dev/null 2>&1 || true
+    fi
+  fi
+fi
+
 printf '#!/bin/sh\nAPP=%q\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
 chmod 0755 "$LAUNCHER"
 cp "$WORK_DIR/$ICON_NAME" "$ICON_FILE"

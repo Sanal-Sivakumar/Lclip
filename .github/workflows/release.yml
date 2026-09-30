@@ -127,13 +127,18 @@ jobs:
 
           Verify downloads against `SHA256SUMS`. Both architectures are built natively and the packaged runtime is launched under Xvfb before publication. Desktop-specific shortcut and automatic-paste behavior still follows the support policy in `docs/linux-smoke-test.md`.
           EOF
-          release_flags=(--verify-tag --generate-notes --notes-file release/release-notes.md)
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            release_flags+=(--prerelease)
+            release_flags=(--prerelease)
           else
-            release_flags+=(--latest)
+            release_flags=(--latest)
           fi
-          gh release create "$GITHUB_REF_NAME" release/publish/* "${release_flags[@]}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; uploading updated assets and notes..."
+            gh release upload "$GITHUB_REF_NAME" release/publish/* --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file release/release-notes.md "${release_flags[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" release/publish/* --verify-tag --generate-notes --notes-file release/release-notes.md "${release_flags[@]}"
+          fi
 
   verify-published:
     if: startsWith(github.ref, 'refs/tags/v')
