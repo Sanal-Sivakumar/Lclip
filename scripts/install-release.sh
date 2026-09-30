@@ -190,7 +190,7 @@ fi
 mv "$NEW_DIR" "$INSTALL_DIR"
 NEW_INSTALL_ACTIVATED=1
 
-printf '#!/bin/sh\nAPP=%q\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
+printf '#!/bin/sh\nAPP=%q\nif [ -f "$(dirname "$APP")/chrome-sandbox" ] && [ ! -u "$(dirname "$APP")/chrome-sandbox" ]; then\n  rm -f "$(dirname "$APP")/chrome-sandbox" 2>/dev/null || true\nfi\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
 chmod 0755 "$LAUNCHER"
 cp "$WORK_DIR/$ICON_NAME" "$ICON_FILE"
 chmod 0644 "$ICON_FILE"
