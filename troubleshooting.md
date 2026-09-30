@@ -8,7 +8,7 @@ This document records the important development problems addressed in LClip and 
 | --- | --- | --- |
 | Old launcher requested `.venv/bin/python3` | Legacy Python installation remained earlier in `PATH` | Current Electron installer replaces `/usr/local/bin/lclip`; troubleshooting identifies additional stale launchers |
 | `npm WARN EBADENGINE` followed by `ERR_REQUIRE_ESM` | Ubuntu Node.js 18 was too old for Electron 43 | Node `>=22.12.0`, `.nvmrc`, package engine declaration, and installer preflight check |
-| Electron aborted on `chrome-sandbox` | Helper ownership/mode was invalid or user-owned helper binary was left in portable install | Portable installer removes helper to use unprivileged user namespaces; system installer applies `root:root` mode `4755` |
+| Electron aborted on `chrome-sandbox` | Helper ownership or setuid mode was not configured | Portable installer configures `root:root` mode `4755` via sudo; system installer applies `root:root` mode `4755` |
 | `Super + .` did not open the picker | Electron/Wayland portal registration was unavailable or conflicted | GNOME-native custom shortcut plus Electron registration of the same chord |
 | First opening felt slow | Full Electron cold start was visible | Window remains hidden until `ready-to-show`; login autostart keeps a warm resident process |
 | Picker disappeared permanently after one selection | Earlier activation hid the picker but did not reopen it | The proven hide-and-paste flow now reopens the existing picker after every attempt |
@@ -275,21 +275,23 @@ You need to make sure that ~/.local/opt/lclip/chrome-sandbox (or /opt/lclip/chro
 ```
 
 **What `chrome-sandbox` is:**
-`chrome-sandbox` is a setuid root helper binary compiled by Chromium for Linux systems where unprivileged user namespaces are unavailable.
+`chrome-sandbox` is a setuid root helper binary compiled by Chromium for Linux systems. It is the core mechanism Chromium and Electron use to create an isolated renderer sandbox on Linux.
 
 **Why Electron requires the correct permissions:**
-If Chromium detects a `chrome-sandbox` binary in its application directory, Chromium's security layer strictly requires that the helper is owned by `root:root` with setuid permissions (`mode 4755`, `-rwsr-xr-x`). If the binary exists but is owned by a regular user (which happens when an archive is extracted by a non-root user), Chromium detects an insecure helper configuration and aborts with this fatal error.
+Chromium's security layer strictly requires that the `chrome-sandbox` helper is owned by `root:root` with setuid permissions (`mode 4755`, `-rwsr-xr-x`). If the binary exists but is owned by a regular user (which happens when an archive is extracted by a non-root user), Chromium detects an unprivileged helper configuration and aborts with this fatal error.
 
 **How the installers configure sandboxing:**
-- **Portable installer (`install-lclip.sh`)**: The portable installer operates without root privileges. It removes `chrome-sandbox` from `~/.local/opt/lclip/`. When this binary is absent, Chromium automatically uses the Linux kernel's standard **unprivileged user namespaces sandbox** (`CLONE_NEWUSER`). This keeps Electron renderer sandboxing fully active without requiring `sudo` or setuid helpers.
+- **Portable installer (`install-lclip.sh`)**: The portable installer installs to `~/.local/opt/lclip/`. It automatically uses `sudo` to configure `root:root` ownership and `4755` permissions on `~/.local/opt/lclip/chrome-sandbox`. If `sudo` is unavailable during installation, it prints the exact command needed.
 - **System installer (`scripts/install-system.sh`)**: The system installer runs with `sudo` and installs to `/opt/lclip/`. It changes the bundle ownership to `root:root` and applies mode `4755` to `/opt/lclip/chrome-sandbox`.
 
 **Diagnosis and Resolution:**
 
 1. **If using the portable installation (`~/.local/opt/lclip`):**
-   Ensure `chrome-sandbox` is removed so Electron uses user namespaces:
+   Run:
    ```bash
-   rm -f ~/.local/opt/lclip/chrome-sandbox
+   sudo chown root:root ~/.local/opt/lclip/chrome-sandbox
+   sudo chmod 4755 ~/.local/opt/lclip/chrome-sandbox
+   ls -l ~/.local/opt/lclip/chrome-sandbox
    ~/.local/bin/lclip --show
    ```
    Or rerun the official portable installer:
@@ -297,23 +299,7 @@ If Chromium detects a `chrome-sandbox` binary in its application directory, Chro
    ./install-lclip.sh
    ```
 
-2. **If your Linux kernel restricts unprivileged user namespaces:**
-   Some hardened Linux systems or kernels with `kernel.unprivileged_userns_clone=0` or strict AppArmor restrictions may require either:
-   - Enabling unprivileged user namespaces:
-     ```bash
-     sudo sysctl -w kernel.unprivileged_userns_clone=1
-     ```
-   - Or using the system installation, which sets up the root-owned SUID helper in `/opt/lclip`:
-     ```bash
-     ./scripts/install-system.sh
-     ```
-   - Or setting setuid root permissions on the portable helper if you choose to keep it:
-     ```bash
-     sudo chown root:root ~/.local/opt/lclip/chrome-sandbox
-     sudo chmod 4755 ~/.local/opt/lclip/chrome-sandbox
-     ```
-
-3. **If using the system installation (`/opt/lclip`):**
+2. **If using the system installation (`/opt/lclip`):**
    Fix ownership and permissions on the system helper:
    ```bash
    sudo chown root:root /opt/lclip/chrome-sandbox

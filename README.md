@@ -152,8 +152,8 @@ chmod +x install-lclip.sh
 
 The installer requires only `curl` or `wget`, `tar`, and `sha256sum`. Run `./install-lclip.sh --help` for a custom prefix, a specific version, or installation without login autostart.
 
-**Electron Sandboxing in Portable Installations:**
-Portable installations use Chromium's unprivileged Linux user namespaces sandbox (`CLONE_NEWUSER`). This provides full process isolation and renderer sandboxing with zero root permissions and without requiring setuid helpers.
+**Electron Sandboxing:**
+Electron enforces strict renderer process sandboxing. On Linux distributions (including Ubuntu 24.04+ where unprivileged user namespaces are restricted by default), Chromium uses the SUID sandbox helper binary (`chrome-sandbox`). The installer configures `chrome-sandbox` with `root:root 4755` permissions via `sudo`. If `sudo` is unavailable during installation, run `sudo chown root:root ~/.local/opt/lclip/chrome-sandbox && sudo chmod 4755 ~/.local/opt/lclip/chrome-sandbox` to enable the sandbox. Never disable sandboxing or pass `--no-sandbox`.
 
 ### Direct stable downloads
 
@@ -475,7 +475,7 @@ See [technical_details.md](technical_details.md) for a beginner-friendly explana
 - State is written with user-only file permissions (`0600`) inside a user-only directory (`0700`).
 - LClip registers one global chord and does not record arbitrary keyboard input.
 - The UI has Node.js integration disabled, context isolation enabled, and Electron sandboxing strictly enabled.
-- Portable installations use Chromium's unprivileged user namespaces sandbox (`CLONE_NEWUSER`); system installations use root-owned mode `4755` SUID sandboxing. Never pass `--no-sandbox` and never run LClip as root.
+- Electron sandboxing is strictly enabled across both portable and system installations (`chrome-sandbox` configured with `root:root 4755`). Never pass `--no-sandbox` and never run LClip as root.
 - A restrictive Content Security Policy blocks arbitrary scripts, objects, navigation, and renderer network connections.
 - External links are limited to official GIPHY pages and open in the system browser.
 - GIPHY is optional; history, emoji, kaomoji, and symbols work offline.

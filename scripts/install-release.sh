@@ -18,9 +18,10 @@ Options:
   --no-autostart     Do not start LClip automatically after graphical login
   --help             Show this help
 
-This installer needs no root access, Node.js, npm, or FUSE. It downloads the
-architecture-matched tar.gz release, verifies SHA256SUMS, and rolls back an
-existing per-user installation if activation fails.
+This installer installs LClip for the current user without requiring Node.js,
+npm, or FUSE. It downloads the architecture-matched tar.gz release, verifies
+SHA256SUMS, configures desktop and shortcut integration, sets sandbox permissions,
+and rolls back an existing per-user installation if activation fails.
 EOF
 }
 
@@ -165,23 +166,6 @@ rm -rf "$NEW_DIR" "$ROLLBACK_DIR"
 mv "$RUNTIME_ROOT" "$NEW_DIR"
 mkdir -p "$NEW_DIR/resources"
 printf 'v%s\n' "$RELEASE_VERSION" >"$NEW_DIR/resources/LCLIP_PORTABLE_INSTALL"
-# Handle Electron sandbox setup:
-# On Linux, Electron uses either the unprivileged user namespaces sandbox (CLONE_NEWUSER)
-# or the SUID sandbox helper (chrome-sandbox with root:root ownership and mode 4755).
-# On distributions like Ubuntu 23.10+ that restrict unprivileged user namespaces by default,
-# chrome-sandbox must be configured as root:root 4755.
-USERNS_RESTRICTED=0
-if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] && [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" == "1" ]]; then
-  USERNS_RESTRICTED=1
-elif [[ -r /proc/sys/kernel/unprivileged_userns_clone ]] && [[ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" == "0" ]]; then
-  USERNS_RESTRICTED=1
-fi
-
-if [[ "$USERNS_RESTRICTED" -eq 0 ]]; then
-  # On systems with unrestricted unprivileged user namespaces, remove the helper
-  # so Chromium seamlessly uses user namespaces without requiring root permissions.
-  rm -f "$NEW_DIR/chrome-sandbox"
-fi
 
 mkdir -p "$(dirname "$DESKTOP_FILE")" "$(dirname "$ICON_FILE")" "$(dirname "$AUTOSTART_FILE")"
 backup_file "$LAUNCHER" launcher
@@ -202,16 +186,18 @@ mv "$NEW_DIR" "$INSTALL_DIR"
 NEW_INSTALL_ACTIVATED=1
 
 if [[ -f "$INSTALL_DIR/chrome-sandbox" ]]; then
-  if [[ "${EUID}" -eq 0 ]]; then
-    chown root:root "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
-    chmod 4755 "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
-  elif command -v sudo >/dev/null 2>&1; then
-    echo "Configuring Electron sandbox helper (requires administrator password)..."
-    sudo chown root:root "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
-    sudo chmod 4755 "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+  if [[ ! -u "$INSTALL_DIR/chrome-sandbox" || "$(stat -c '%U:%G' "$INSTALL_DIR/chrome-sandbox" 2>/dev/null)" != "root:root" ]]; then
+    if [[ "${EUID}" -eq 0 ]]; then
+      chown root:root "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+      chmod 4755 "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo chown root:root "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+      sudo chmod 4755 "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+    fi
   fi
-  if [[ ! -u "$INSTALL_DIR/chrome-sandbox" ]]; then
-    echo "Notice: chrome-sandbox is not setuid root. On Ubuntu 24.04+, run:" >&2
+  if [[ ! -u "$INSTALL_DIR/chrome-sandbox" || "$(stat -c '%U:%G' "$INSTALL_DIR/chrome-sandbox" 2>/dev/null)" != "root:root" ]]; then
+    echo "Notice: chrome-sandbox requires root ownership and setuid permissions (mode 4755)." >&2
+    echo "  To enable the Electron sandbox, run:" >&2
     echo "  sudo chown root:root $INSTALL_DIR/chrome-sandbox && sudo chmod 4755 $INSTALL_DIR/chrome-sandbox" >&2
   fi
 fi

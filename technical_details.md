@@ -357,11 +357,11 @@ Read, parse, permission, and write failures are exposed through the Settings sto
 
 `sandbox: true` applies Chromium renderer sandbox restrictions. The main process remains privileged enough to use Electron desktop APIs, so it must validate renderer requests.
 
-On Linux, Chromium provides two Layer-1 sandbox mechanisms:
-1. **Unprivileged User Namespaces Sandbox (`CLONE_NEWUSER`)**: The portable no-root installer (`install-lclip.sh`) removes `chrome-sandbox` so Chromium uses user namespaces. This allows full renderer process isolation without requiring `sudo` or setuid helpers.
-2. **SUID Sandbox Helper (`chrome-sandbox`)**: For system-wide installations under `/opt/lclip`, the system installer configures `/opt/lclip/chrome-sandbox` with `root:root` ownership and mode `4755` (`-rwsr-xr-x`).
+On Linux, Chromium provides Layer-1 sandbox mechanisms:
+1. **SUID Sandbox Helper (`chrome-sandbox`)**: Chromium uses a root-owned setuid helper (`chrome-sandbox` with `root:root` ownership and mode `4755`, `-rwsr-xr-x`) to construct a secure sandbox. The portable installer configures this automatically when `sudo` is available, and the system installer configures `/opt/lclip/chrome-sandbox`.
+2. **Unprivileged User Namespaces Sandbox (`CLONE_NEWUSER`)**: On distributions where unprivileged user namespaces are permitted by kernel policy, Chromium can alternatively isolate renderer processes using unprivileged namespaces.
 
-Running with `--no-sandbox` weakens process isolation and is not an acceptable replacement. Running the entire LClip application as root is unsafe.
+Running with `--no-sandbox` weakens process isolation and is strictly prohibited in LClip. Running the entire LClip application as root is unsafe.
 
 ### Node integration
 
