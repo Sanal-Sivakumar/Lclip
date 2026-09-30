@@ -1,4 +1,5 @@
 import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, shell, Tray } from "electron";
+import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { addHistoryItem, StateStore } from "./store.mjs";
@@ -191,8 +192,19 @@ function toggleWindow() {
   else showWindow();
 }
 
+function disableIbusEmojiShortcut() {
+  if (process.platform !== "linux") return;
+  const desktop = String(process.env.XDG_CURRENT_DESKTOP || "").toUpperCase();
+  if (!desktop.includes("GNOME")) return;
+  execFile("gsettings", ["get", "org.freedesktop.ibus.panel.emoji", "hotkey"], { timeout: 1000, windowsHide: true }, (err, stdout) => {
+    if (err || !stdout || !stdout.includes("<Super>period")) return;
+    execFile("gsettings", ["set", "org.freedesktop.ibus.panel.emoji", "hotkey", "['<Super>semicolon']"], { timeout: 1000, windowsHide: true }, () => {});
+  });
+}
+
 function registerShortcut() {
   if (process.platform !== "linux") return false;
+  disableIbusEmojiShortcut();
   try {
     return globalShortcut.register("Super+.", showWindow);
   } catch {

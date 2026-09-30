@@ -99,4 +99,11 @@ const next = [...new Set([...bindings, bindingPath])];
 const serialized = `[${next.map(path => `'${path}'`).join(", ")}]`;
 gsettings("set", rootSchema, "custom-keybindings", serialized);
 
+try {
+  const ibusEmoji = gsettingsSafe("get", "org.freedesktop.ibus.panel.emoji", "hotkey");
+  if (ibusEmoji.includes("<Super>period")) {
+    gsettingsSafe("set", "org.freedesktop.ibus.panel.emoji", "hotkey", "['<Super>semicolon']");
+  }
+} catch {}
+
 console.log("Configured GNOME shortcut: Super + .");

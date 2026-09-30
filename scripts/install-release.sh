@@ -367,6 +367,11 @@ if [[ "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null 2>&1;
     SERIALIZED="[$(printf "%s, " "${NEXT_BINDINGS[@]}" | sed 's/, $//')]"
     gsettings set "$ROOT_SCHEMA" custom-keybindings "$SERIALIZED" 2>/dev/null || true
   fi
+
+  IBUS_HOTKEY="$(gsettings get org.freedesktop.ibus.panel.emoji hotkey 2>/dev/null || true)"
+  if [[ "$IBUS_HOTKEY" == *"<Super>period"* ]]; then
+    gsettings set org.freedesktop.ibus.panel.emoji hotkey "['<Super>semicolon']" 2>/dev/null || true
+  fi
 fi
 
 ROLLBACK_ACTIVE=0

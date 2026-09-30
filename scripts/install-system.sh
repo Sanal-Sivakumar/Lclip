@@ -355,6 +355,10 @@ command -v gtk-update-icon-cache >/dev/null && "${SUDO[@]}" gtk-update-icon-cach
 
 DESKTOP_NAME="${XDG_CURRENT_DESKTOP:-}"
 if [[ "${EUID}" -ne 0 && "${DESKTOP_NAME^^}" == *GNOME* ]] && command -v gsettings >/dev/null; then
+  IBUS_HOTKEY="$(gsettings get org.freedesktop.ibus.panel.emoji hotkey 2>/dev/null || true)"
+  if [[ "$IBUS_HOTKEY" == *"<Super>period"* ]]; then
+    gsettings set org.freedesktop.ibus.panel.emoji hotkey "['<Super>semicolon']" 2>/dev/null || true
+  fi
   node "$PROJECT_DIR/scripts/configure-gnome-shortcut.mjs" --command "/usr/local/bin/lclip --show" || echo "GNOME shortcut setup failed; add /usr/local/bin/lclip --show in Keyboard Settings." >&2
 fi
 
