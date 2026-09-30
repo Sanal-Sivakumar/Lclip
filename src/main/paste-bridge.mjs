@@ -17,20 +17,33 @@ async function executable(name, env = process.env) {
   return "";
 }
 
-async function ydotoolSyntax(command) {
+async function ydotoolSyntax(command, env = process.env) {
+  const socketCandidates = [
+    env.YDOTOOL_SOCKET,
+    "/tmp/.ydotool_socket",
+    env.XDG_RUNTIME_DIR ? `${env.XDG_RUNTIME_DIR}/.ydotool_socket` : undefined
+  ].filter(Boolean);
+
   let output = "";
-  for (const args of [["--version"], ["key", "--help"]]) {
-    try {
-      const result = await run(command, args, { timeout: 1200, windowsHide: true });
-      output += `\n${result.stdout || ""}\n${result.stderr || ""}`;
-    } catch (error) {
-      output += `\n${error?.stdout || ""}\n${error?.stderr || ""}`;
+  for (const args of [["--version"], ["key", "--help"], ["key", "-h"]]) {
+    for (const socketPath of socketCandidates) {
+      try {
+        const result = await run(command, args, {
+          timeout: 1200,
+          windowsHide: true,
+          env: { ...env, YDOTOOL_SOCKET: socketPath }
+        });
+        output += `\n${result.stdout || ""}\n${result.stderr || ""}`;
+      } catch (error) {
+        output += `\n${error?.stdout || ""}\n${error?.stderr || ""}`;
+      }
     }
   }
+  if (/KEYCODES?|<keycode>|raw keycodes/i.test(output)) return "keycodes";
   const version = output.match(/(?:^|\s)v?(\d+)\.(\d+)(?:\.(\d+))?/i);
-  if (version) return Number(version[1]) >= 1 ? "keycodes" : "legacy-symbolic";
-  if (/KEYCODE\s*:\s*PRESSED|keycodes?/i.test(output)) return "keycodes";
-  return "legacy-symbolic";
+  if (version && Number(version[1]) >= 1) return "keycodes";
+  if (/symbolic|ctrl\+alt/i.test(output)) return "legacy-symbolic";
+  return "keycodes";
 }
 
 export async function detectPasteBridge(env = process.env, platform = process.platform) {
@@ -42,7 +55,7 @@ export async function detectPasteBridge(env = process.env, platform = process.pl
 
   const candidates = [];
   if (ydotool) {
-    const syntax = await ydotoolSyntax(ydotool);
+    const syntax = await ydotoolSyntax(ydotool, env);
     candidates.push({
       id: "ydotool",
       command: ydotool,
