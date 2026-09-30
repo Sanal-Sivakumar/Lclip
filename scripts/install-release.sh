@@ -165,12 +165,23 @@ rm -rf "$NEW_DIR" "$ROLLBACK_DIR"
 mv "$RUNTIME_ROOT" "$NEW_DIR"
 mkdir -p "$NEW_DIR/resources"
 printf 'v%s\n' "$RELEASE_VERSION" >"$NEW_DIR/resources/LCLIP_PORTABLE_INSTALL"
-chmod 0755 "$NEW_DIR/lclip"
-# In portable user installations, remove chrome-sandbox if present.
-# Chromium uses the standard Linux unprivileged user namespaces sandbox (CLONE_NEWUSER)
-# without requiring root permissions. Leaving a non-root chrome-sandbox causes Chromium's
-# setuid sandbox check to fail with a fatal error.
-rm -f "$NEW_DIR/chrome-sandbox"
+# Handle Electron sandbox setup:
+# On Linux, Electron uses either the unprivileged user namespaces sandbox (CLONE_NEWUSER)
+# or the SUID sandbox helper (chrome-sandbox with root:root ownership and mode 4755).
+# On distributions like Ubuntu 23.10+ that restrict unprivileged user namespaces by default,
+# chrome-sandbox must be configured as root:root 4755.
+USERNS_RESTRICTED=0
+if [[ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] && [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" == "1" ]]; then
+  USERNS_RESTRICTED=1
+elif [[ -r /proc/sys/kernel/unprivileged_userns_clone ]] && [[ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" == "0" ]]; then
+  USERNS_RESTRICTED=1
+fi
+
+if [[ "$USERNS_RESTRICTED" -eq 0 ]]; then
+  # On systems with unrestricted unprivileged user namespaces, remove the helper
+  # so Chromium seamlessly uses user namespaces without requiring root permissions.
+  rm -f "$NEW_DIR/chrome-sandbox"
+fi
 
 mkdir -p "$(dirname "$DESKTOP_FILE")" "$(dirname "$ICON_FILE")" "$(dirname "$AUTOSTART_FILE")"
 backup_file "$LAUNCHER" launcher
@@ -190,7 +201,22 @@ fi
 mv "$NEW_DIR" "$INSTALL_DIR"
 NEW_INSTALL_ACTIVATED=1
 
-printf '#!/bin/sh\nAPP=%q\nif [ -f "$(dirname "$APP")/chrome-sandbox" ] && [ ! -u "$(dirname "$APP")/chrome-sandbox" ]; then\n  rm -f "$(dirname "$APP")/chrome-sandbox" 2>/dev/null || true\nfi\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
+if [[ -f "$INSTALL_DIR/chrome-sandbox" ]]; then
+  if [[ "${EUID}" -eq 0 ]]; then
+    chown root:root "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+    chmod 4755 "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+  elif command -v sudo >/dev/null 2>&1; then
+    echo "Configuring Electron sandbox helper (requires administrator password)..."
+    sudo chown root:root "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+    sudo chmod 4755 "$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+  fi
+  if [[ ! -u "$INSTALL_DIR/chrome-sandbox" ]]; then
+    echo "Notice: chrome-sandbox is not setuid root. On Ubuntu 24.04+, run:" >&2
+    echo "  sudo chown root:root $INSTALL_DIR/chrome-sandbox && sudo chmod 4755 $INSTALL_DIR/chrome-sandbox" >&2
+  fi
+fi
+
+printf '#!/bin/sh\nAPP=%q\nif [ "${XDG_SESSION_TYPE:-}" = "wayland" ] && [ -n "${DISPLAY:-}" ] && [ "${LCLIP_NATIVE_WAYLAND:-0}" != "1" ]; then\n  exec "$APP" --ozone-platform=x11 "$@"\nfi\nexec "$APP" "$@"\n' "$INSTALL_DIR/lclip" >"$LAUNCHER"
 chmod 0755 "$LAUNCHER"
 cp "$WORK_DIR/$ICON_NAME" "$ICON_FILE"
 chmod 0644 "$ICON_FILE"
