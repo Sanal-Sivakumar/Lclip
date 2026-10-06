@@ -303,10 +303,11 @@ if [[ "$CONFIGURE_YDOTOOL" -eq 1 ]]; then
 
   echo "Configuring restricted /dev/uinput access for $LOGIN_USER…"
   "${SUDO[@]}" groupadd --system --force lclip-uinput
-  "${SUDO[@]}" usermod -aG lclip-uinput "$LOGIN_USER"
+  "${SUDO[@]}" usermod -aG input,lclip-uinput "$LOGIN_USER"
   UINPUT_RULE="$WORK_DIR/80-lclip-uinput.rules"
   cat >"$UINPUT_RULE" <<'EOF'
-KERNEL=="uinput", GROUP="lclip-uinput", MODE="0660", OPTIONS+="static_node=uinput"
+SUBSYSTEM=="misc", KERNEL=="uinput", MODE="0666", OPTIONS+="static_node=uinput"
+KERNEL=="uinput", MODE="0666", OPTIONS+="static_node=uinput"
 EOF
   "${SUDO[@]}" install -m 0644 "$UINPUT_RULE" /etc/udev/rules.d/80-lclip-uinput.rules
   printf 'uinput\n' | "${SUDO[@]}" tee /etc/modules-load.d/lclip-uinput.conf >/dev/null
@@ -315,15 +316,15 @@ EOF
     "${SUDO[@]}" udevadm control --reload-rules || true
     "${SUDO[@]}" udevadm trigger --name-match=uinput || true
   fi
+  if [[ -e /dev/uinput ]]; then
+    "${SUDO[@]}" chmod 0666 /dev/uinput 2>/dev/null || true
+  fi
 
   YDOTOOLD_PATH="$(command -v ydotoold)"
   USER_SERVICE_DIR="$HOME/.config/systemd/user"
   install -d -m 0700 "$USER_SERVICE_DIR"
   YDOTOOL_SERVICE="$WORK_DIR/lclip-ydotoold.service"
   EXEC_START="$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666"
-  if command -v sg >/dev/null 2>&1 && getent group lclip-uinput >/dev/null 2>&1; then
-    EXEC_START="/usr/bin/sg lclip-uinput -c \"$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666\""
-  fi
   cat >"$YDOTOOL_SERVICE" <<EOF
 [Unit]
 Description=LClip ydotool input daemon
@@ -343,11 +344,11 @@ EOF
   if command -v systemctl >/dev/null; then
     systemctl --user daemon-reload
     systemctl --user enable lclip-ydotoold.service
-    systemctl --user start lclip-ydotoold.service || echo "ydotoold could not start before relogin; retry it after the new group membership is active." >&2
+    systemctl --user restart lclip-ydotoold.service || echo "ydotoold could not start before relogin; retry it after the new group membership is active." >&2
   else
     echo "systemd user services are unavailable; start $YDOTOOLD_PATH in the graphical session before using automatic paste." >&2
   fi
-  NEEDS_RELOGIN=1
+  NEEDS_RELOGIN=0
 fi
 
 command -v update-desktop-database >/dev/null && "${SUDO[@]}" update-desktop-database /usr/share/applications || true

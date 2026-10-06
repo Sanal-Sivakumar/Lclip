@@ -224,19 +224,19 @@ LOGIN_USER="${USER:-}"
 if [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]]; then
   if command -v sudo >/dev/null 2>&1; then
     sudo groupadd --system --force lclip-uinput >/dev/null 2>&1 || true
-    sudo usermod -aG lclip-uinput "$LOGIN_USER" >/dev/null 2>&1 || true
-    if [[ ! -f /etc/udev/rules.d/80-lclip-uinput.rules ]]; then
-      echo 'KERNEL=="uinput", GROUP="lclip-uinput", MODE="0660", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/80-lclip-uinput.rules >/dev/null 2>&1 || true
-      printf 'uinput\n' | sudo tee /etc/modules-load.d/lclip-uinput.conf >/dev/null 2>&1 || true
-      sudo modprobe uinput >/dev/null 2>&1 || true
-      if command -v udevadm >/dev/null 2>&1; then
-        sudo udevadm control --reload-rules >/dev/null 2>&1 || true
-        sudo udevadm trigger --name-match=uinput >/dev/null 2>&1 || true
-      fi
+    sudo usermod -aG input,lclip-uinput "$LOGIN_USER" >/dev/null 2>&1 || true
+    cat <<'EOF' | sudo tee /etc/udev/rules.d/80-lclip-uinput.rules >/dev/null 2>&1 || true
+SUBSYSTEM=="misc", KERNEL=="uinput", MODE="0666", OPTIONS+="static_node=uinput"
+KERNEL=="uinput", MODE="0666", OPTIONS+="static_node=uinput"
+EOF
+    printf 'uinput\n' | sudo tee /etc/modules-load.d/lclip-uinput.conf >/dev/null 2>&1 || true
+    sudo modprobe uinput >/dev/null 2>&1 || true
+    if command -v udevadm >/dev/null 2>&1; then
+      sudo udevadm control --reload-rules >/dev/null 2>&1 || true
+      sudo udevadm trigger --name-match=uinput >/dev/null 2>&1 || true
     fi
     if [[ -e /dev/uinput ]]; then
-      sudo chgrp lclip-uinput /dev/uinput >/dev/null 2>&1 || true
-      sudo chmod 0660 /dev/uinput >/dev/null 2>&1 || true
+      sudo chmod 0666 /dev/uinput >/dev/null 2>&1 || true
     fi
   fi
   if command -v ydotoold >/dev/null 2>&1; then
@@ -244,9 +244,6 @@ if [[ -n "$LOGIN_USER" && "$LOGIN_USER" != "root" ]]; then
     mkdir -p "$USER_SERVICE_DIR"
     YDOTOOLD_PATH="$(command -v ydotoold)"
     EXEC_START="$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666"
-    if command -v sg >/dev/null 2>&1 && getent group lclip-uinput >/dev/null 2>&1; then
-      EXEC_START="/usr/bin/sg lclip-uinput -c \"$YDOTOOLD_PATH --socket-path=/tmp/.ydotool_socket --socket-perm=0666\""
-    fi
     cat >"$USER_SERVICE_DIR/lclip-ydotoold.service" <<EOF
 [Unit]
 Description=LClip ydotool input daemon

@@ -33,7 +33,8 @@ let lastClipboard = "";
 let isQuitting = false;
 let rendererReady = false;
 let pendingShow = false;
-let hasPositionedWindow = false;
+let lastShowTime = 0;
+let hasHadFocus = false;
 let activationInProgress = false;
 let quitAfterFlush = false;
 let lastPersistenceNotification = "";
@@ -151,12 +152,23 @@ function createWindow() {
       window.hide();
     }
   });
+  window.on("focus", () => {
+    hasHadFocus = true;
+  });
+  window.on("hide", () => {
+    hasHadFocus = false;
+  });
   window.on("blur", () => {
-    if (window?.isVisible() && !activationInProgress && !window.webContents.isDevToolsOpened()) window.hide();
+    const timeSinceShow = Date.now() - lastShowTime;
+    if (timeSinceShow < 400 || !hasHadFocus) return;
+    if (window?.isVisible() && !activationInProgress && !window.webContents.isDevToolsOpened()) {
+      window.hide();
+    }
   });
 }
 
 function positionWindow() {
+  if (!window || window.isDestroyed()) return;
   const point = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(point);
   const { x, y, width, height } = display.workArea;
@@ -174,12 +186,19 @@ function revealWindow(resetToHistory) {
     return;
   }
   pendingShow = false;
-  if (!hasPositionedWindow) {
-    positionWindow();
-    hasPositionedWindow = true;
+  lastShowTime = Date.now();
+  hasHadFocus = false;
+  if (window.isMinimized()) {
+    window.restore();
   }
+  positionWindow();
+  window.setAlwaysOnTop(true, "pop-up-menu");
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   window.show();
   window.focus();
+  if (typeof window.moveTop === "function") {
+    window.moveTop();
+  }
   if (resetToHistory) window.webContents.send("lclip:open");
 }
 
